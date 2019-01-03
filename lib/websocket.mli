@@ -1,10 +1,10 @@
 module Opcode : sig
-  type standard_non_control = 
+  type standard_non_control =
     [ `Continuation
     | `Text
     | `Binary ]
 
-  type standard_control = 
+  type standard_control =
     [ `Connection_close
     | `Ping
     | `Pong ]
@@ -20,7 +20,7 @@ module Opcode : sig
   val code   : t -> int
 
   val of_code     : int -> t option
-  val of_code_exn : int -> t 
+  val of_code_exn : int -> t
 
   val to_int : t -> int
 
@@ -51,7 +51,7 @@ module Close_code : sig
   val code : t -> int
 
   val of_code     : int -> t option
-  val of_code_exn : int -> t 
+  val of_code_exn : int -> t
 
   val to_int : t -> int
 
@@ -91,11 +91,11 @@ module Frame : sig
     -> opcode:Opcode.standard_control
     -> unit
 
-  val schedule_serialize 
+  val schedule_serialize
     :  ?mask:int32
     -> Faraday.t
-    -> is_fin:bool 
-    -> opcode:Opcode.t 
+    -> is_fin:bool
+    -> opcode:Opcode.t
     -> payload:Bigstringaf.t
     -> off:int
     -> len:int
@@ -114,8 +114,8 @@ module Frame : sig
   val serialize_bytes
     :  ?mask:int32
     -> Faraday.t
-    -> is_fin:bool 
-    -> opcode:Opcode.t 
+    -> is_fin:bool
+    -> opcode:Opcode.t
     -> payload:Bytes.t
     -> off:int
     -> len:int
