@@ -5,7 +5,7 @@ type mode =
   | `Server
   ]
 
-type t 
+type t
 
 val create
   : mode
