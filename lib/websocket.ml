@@ -178,7 +178,7 @@ module Frame = struct
     bits land (1 lsl 7) = 1 lsl 7
 
   let mask t =
-    if not (has_mask t) 
+    if not (has_mask t)
     then None
     else
       Some (
@@ -223,10 +223,10 @@ module Frame = struct
     with_payload t ~f:Bigstringaf.copy
   ;;
 
-  let copy_payload_bytes t = 
+  let copy_payload_bytes t =
     with_payload t ~f:(fun bs ~off:src_off ~len ->
       let bytes = Bytes.create len in
-      Bigstringaf.blit_to_bytes bs ~src_off bytes ~dst_off:0 ~len; 
+      Bigstringaf.blit_to_bytes bs ~src_off bytes ~dst_off:0 ~len;
       bytes)
   ;;
 
