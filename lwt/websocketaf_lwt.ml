@@ -115,12 +115,9 @@ module Server = struct
       Lwt.async (fun () ->
         Lwt.catch
           read_loop_step
-            (fun exn ->
-              (* XXX(andreas): missing error reporting *)
-              (* Server_connection.report_exn connection exn;*)
-              Printexc.print_backtrace stdout;
-              ignore(raise exn);
-              Lwt.return_unit))
+          (fun exn ->
+            Server_connection.report_exn connection exn;
+            Lwt.return_unit))
     in
 
 
@@ -151,13 +148,9 @@ module Server = struct
         Lwt.catch
           write_loop_step
           (fun exn ->
-            (* XXX(andreas): missing error reporting *)
-            (*Server_connection.report_exn connection exn;*)
-            Printexc.print_backtrace stdout;
-            ignore(raise exn);
+            Server_connection.report_exn connection exn;
             Lwt.return_unit))
     in
-
 
     read_loop ();
     write_loop ();
@@ -180,17 +173,18 @@ module Server = struct
         Server_connection.create
           ~sha1
           ~fd:socket
-          ~websocket_handler
+          websocket_handler
       in
       start_read_write_loops ~socket connection
 
 
-  let upgrade_connection ?config:_ ?headers ~reqd websocket_handler =
+  let upgrade_connection ?config:_ ?headers ~reqd ~error_handler websocket_handler =
     let connection =
       Server_connection.upgrade
         ~sha1
         ~reqd
         ?headers
+        ~error_handler
         websocket_handler
     in
     let socket = Httpaf.Reqd.descriptor reqd in
