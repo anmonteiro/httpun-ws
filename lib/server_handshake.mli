@@ -4,6 +4,7 @@ type 'handle t
 
 val create
   :  request_handler : 'handle Httpaf.Server_connection.request_handler
+  -> fd : 'handle
   -> 'handle t
 
 val next_read_operation  : _ t -> [ `Read | `Close | `Yield ]
