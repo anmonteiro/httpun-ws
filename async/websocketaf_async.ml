@@ -114,7 +114,6 @@ module Server = struct
         Server_connection.yield_reader connection reader_thread
 
       | `Close ->
-
         Ivar.fill read_complete ();
         if not (Fd.is_closed fd)
         then Socket.shutdown socket `Receive
@@ -127,6 +126,12 @@ module Server = struct
       | `Write iovecs ->
         writev iovecs >>> fun result ->
           Server_connection.report_write_result connection result;
+          writer_thread ()
+
+      | `Upgrade (iovecs, fn) ->
+        writev iovecs >>> fun result ->
+          Server_connection.report_write_result connection result;
+          fn socket;
           writer_thread ()
 
       | `Yield ->
@@ -159,18 +164,16 @@ module Server = struct
       let conn = Server_connection.create ~sha1 websocket_handler in
       start_read_write_loops ~socket conn
 
-  let upgrade_connection ?config:_ ?headers ~reqd ~error_handler ~websocket_handler socket =
-    match
-      Server_connection.upgrade
-        ~sha1
-        ~reqd
-        ?headers
-        ~error_handler
-        websocket_handler
-    with
-    | Ok connection ->
-      start_read_write_loops ~socket connection >>| fun x -> Ok x
-    | Error _ as err -> Deferred.return err
+  let create_upgraded_connection_handler ?config:_ ~websocket_handler ~error_handler =
+    fun client_addr socket ->
+      let websocket_handler = websocket_handler client_addr in
+      let connection =
+        Server_connection.create_upgraded ~error_handler ~websocket_handler
+      in
+      start_read_write_loops ~socket connection
+
+  let respond_with_upgrade ?headers reqd upgrade_handler =
+    Deferred.return (Server_connection.respond_with_upgrade ?headers ~sha1 reqd upgrade_handler)
 end
 
 module Client = struct

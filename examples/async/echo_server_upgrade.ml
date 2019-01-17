@@ -1,14 +1,14 @@
 open Core
 open Async
 
-let connection_handler socket =
+let connection_handler =
   let module Body = Httpaf.Body in
   let module Headers = Httpaf.Headers in
   let module Reqd = Httpaf.Reqd in
   let module Response = Httpaf.Response in
   let module Status = Httpaf.Status in
 
-  let websocket_handler wsd =
+  let websocket_handler _client_address wsd =
     let frame ~opcode ~is_fin:_ bs ~off ~len =
       match opcode with
       | `Continuation
@@ -48,25 +48,35 @@ let connection_handler socket =
     Body.write_string body message;
     Body.close_writer body
   in
-  let request_handler socket _addr reqd =
-    Websocketaf_async.Server.upgrade_connection
-      ~reqd
+  let upgrade_handler addr socket =
+    Websocketaf_async.Server.create_upgraded_connection_handler
       ~error_handler
       ~websocket_handler
-      socket
-    |> ignore
-
+      addr socket
+    |> Deferred.don't_wait_for
+  in
+  let request_handler addr reqd =
+    (Websocketaf_async.Server.respond_with_upgrade reqd (upgrade_handler addr)
+    >>| function
+    | Ok () -> ()
+    | Error err_str ->
+      let response = Response.create
+        ~headers:(Httpaf.Headers.of_list ["Connection", "close"])
+        `Bad_request
+      in
+      Reqd.respond_with_string reqd response err_str)
+    |> Deferred.don't_wait_for
   in
   Httpaf_async.Server.create_connection_handler
     ?config:None
-    ~request_handler:(request_handler socket)
+    ~request_handler:request_handler
     ~error_handler:http_error_handler
 
 let main port max_accepts_per_batch () =
   let where_to_listen = Tcp.Where_to_listen.of_port port in
   Tcp.(Server.create_sock ~on_handler_error:`Raise
       ~backlog:10_000 ~max_connections:10_000 ~max_accepts_per_batch where_to_listen)
-    (fun client_addr socket -> connection_handler socket client_addr socket)
+    connection_handler
   >>= fun _server ->
   Log.Global.printf "Listening on port %i and echoing websocket messages.\n%!" port;
   Deferred.never ()

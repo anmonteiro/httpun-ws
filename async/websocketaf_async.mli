@@ -24,13 +24,18 @@ module Server : sig
     -> ([`Active], 'a) Socket.t
     -> unit Deferred.t
 
-
-  val upgrade_connection
+  val create_upgraded_connection_handler
     :  ?config : Httpaf.Config.t
-    -> ?headers: Httpaf.Headers.t
-    -> reqd : Httpaf.Reqd.t
+    -> websocket_handler :
+      (([< Socket.Address.t] as 'a)
+      -> Websocketaf.Wsd.t
+      -> Websocketaf.Server_connection.input_handlers)
     -> error_handler : Websocketaf.Server_connection.error_handler
-    -> websocket_handler: (Websocketaf.Wsd.t -> Websocketaf.Server_connection.input_handlers)
-    -> ([`Active], [< Socket.Address.t]) Socket.t
-    -> (unit, string) Deferred.Result.t
+    -> ('a -> ([`Active], 'a) Socket.t -> unit Deferred.t)
+
+  val respond_with_upgrade
+  : ?headers : Httpaf.Headers.t
+  -> ([`Active], [< Socket.Address.t] as 'a) Socket.t Httpaf.Reqd.t
+  -> (([`Active], 'a) Socket.t -> unit)
+  -> (unit, string) Deferred.Result.t
 end

@@ -15,14 +15,17 @@ module Server : sig
     :  ?config : Httpaf.Config.t
     -> websocket_handler : (Unix.sockaddr -> Websocketaf.Wsd.t -> Websocketaf.Server_connection.input_handlers)
     -> error_handler : (Unix.sockaddr -> Httpaf.Server_connection.error_handler)
-      -> (Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t)
+    -> (Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t)
 
-  val upgrade_connection
+  val create_upgraded_connection_handler
     :  ?config : Httpaf.Config.t
-    -> ?headers: Httpaf.Headers.t
-    -> reqd : Httpaf.Reqd.t
+    -> websocket_handler : (Unix.sockaddr -> Websocketaf.Wsd.t -> Websocketaf.Server_connection.input_handlers)
     -> error_handler : Websocketaf.Server_connection.error_handler
-    -> websocket_handler: (Websocketaf.Wsd.t -> Websocketaf.Server_connection.input_handlers)
-    -> Lwt_unix.file_descr
-    -> (unit, string) result Lwt.t
+    -> (Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t)
+
+  val respond_with_upgrade
+  : ?headers : Httpaf.Headers.t
+  -> Lwt_unix.file_descr Httpaf.Reqd.t
+  -> (Lwt_unix.file_descr -> unit)
+  -> (unit, string) Lwt_result.t
 end

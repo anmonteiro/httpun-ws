@@ -1,8 +1,8 @@
 module IOVec = Httpaf.IOVec
 
-type state =
+type 'fd state =
   | Uninitialized
-  | Handshake of Server_handshake.t
+  | Handshake of 'fd Server_handshake.t
   | Websocket of Server_websocket.t
 
 type input_handlers = Server_websocket.input_handlers =
@@ -13,11 +13,32 @@ type error = [ `Exn of exn ]
 
 type error_handler = Wsd.t -> error -> unit
 
-type t =
-  { mutable state: state
+type 'fd t =
+  { mutable state: 'fd state
   ; websocket_handler: Wsd.t -> input_handlers
   ; error_handler: error_handler
+  ; wakeup_reader : (unit -> unit) list ref
   }
+
+let is_closed t =
+  match t.state with
+  | Uninitialized -> false
+  | Handshake handshake ->
+    Server_handshake.is_closed handshake
+  | Websocket websocket ->
+    Server_websocket.is_closed websocket
+
+let on_wakeup_reader t k =
+  if is_closed t
+  then failwith "called on_wakeup_reader on closed conn"
+  else
+    t.wakeup_reader := k::!(t.wakeup_reader)
+
+let wakeup_reader t =
+  let fs = !(t.wakeup_reader) in
+  Format.eprintf "crkg %d@."(List.length fs);
+  t.wakeup_reader := [];
+  List.iter (fun f -> f ()) fs
 
 let passes_scrutiny _headers =
   true (* XXX(andreas): missing! *)
@@ -29,55 +50,7 @@ let default_error_handler wsd (`Exn exn) =
   Wsd.close wsd
 ;;
 
-let create ~sha1 ?(error_handler=default_error_handler) websocket_handler =
-  let t =
-    { state = Uninitialized
-    ; websocket_handler
-    ; error_handler
-    }
-  in
-  let request_handler reqd =
-    let request = Httpaf.Reqd.request reqd in
-    if passes_scrutiny request.headers then begin
-      let key = Httpaf.Headers.get_exn request.headers "sec-websocket-key" in
-      let accept = sha1 (key ^ "258EAFA5-E914-47DA-95CA-C5AB0DC85B11") in
-      let headers = Httpaf.Headers.of_list [
-        "upgrade",              "websocket";
-        "connection",           "upgrade";
-        "sec-websocket-accept", accept
-      ] in
-      let response = Httpaf.(Response.create ~headers `Switching_protocols) in
-      let body = Httpaf.Reqd.respond_with_streaming
-        reqd
-        ~flush_headers_immediately:true
-        response
-      in
-      match t.state with
-      | Handshake handshake ->
-          Server_handshake.reset_handshake handshake
-      | _ -> ();
-      Httpaf.Body.close_writer body
-    end else begin
-      let response = Httpaf.(Response.create
-        ~headers:(Headers.of_list ["Connection", "close"])
-        `Bad_request)
-      in
-      Httpaf.Reqd.respond_with_string reqd response "Didn't pass scrutiny";
-      match t.state with
-      | Handshake handshake ->
-          Server_handshake.report_handshake_failure handshake
-      | _ -> ();
-    end
-  in
-  let handshake = Server_handshake.create ~request_handler in
-  t.state <- Handshake handshake;
-  t
-
-let upgrade
-  ~sha1
-  ~reqd
-  ?(headers=Httpaf.Headers.empty)
-  ?(error_handler=default_error_handler) websocket_handler =
+let respond_with_upgrade ?(headers=Httpaf.Headers.empty) ~sha1 reqd upgrade_handler =
   let request = Httpaf.Reqd.request reqd in
   if passes_scrutiny request.headers then begin
     let key = Httpaf.Headers.get_exn request.headers "sec-websocket-key" in
@@ -91,17 +64,42 @@ let upgrade
     in
     let headers = Httpaf.Headers.(add_list upgrade_headers (to_list headers)) in
     let response = Httpaf.(Response.create ~headers `Switching_protocols) in
-    let _body = Httpaf.Reqd.respond_with_streaming
-      reqd
-      ~flush_headers_immediately:true
-      response
-    in
-    Ok { state = Websocket (Server_websocket.create ~websocket_handler)
-       ; websocket_handler
-       ; error_handler
-       }
+    Ok (Httpaf.Reqd.respond_with_upgrade reqd response upgrade_handler)
   end else
     Error "Didn't pass scrutiny"
+
+let create ~sha1 ?(error_handler=default_error_handler) websocket_handler =
+  let t =
+    { state = Uninitialized
+    ; websocket_handler
+    ; error_handler
+    ; wakeup_reader = ref []
+    }
+  in
+  let upgrade_handler _fd =
+    t.state <- Websocket (Server_websocket.create ~websocket_handler);
+    wakeup_reader t
+  in
+  let request_handler reqd =
+    match respond_with_upgrade ?headers:None ~sha1 reqd upgrade_handler with
+    | Ok () -> ()
+    | Error msg ->
+      let response = Httpaf.(Response.create
+        ~headers:(Headers.of_list ["Connection", "close"])
+        `Bad_request)
+      in
+      Httpaf.Reqd.respond_with_string reqd response msg
+  in
+  let handshake = Server_handshake.create ~request_handler in
+  t.state <- Handshake handshake;
+  t
+
+let create_upgraded ?(error_handler=default_error_handler) ~websocket_handler =
+    { state = Websocket (Server_websocket.create ~websocket_handler)
+    ; websocket_handler
+    ; error_handler
+    ; wakeup_reader = ref []
+    }
 
 let close t =
   match t.state with
@@ -112,8 +110,10 @@ let close t =
 
 let set_error_and_handle t error =
   begin match t.state with
-  | Uninitialized
-  | Handshake _ -> assert false
+  | Uninitialized -> assert false
+  | Handshake _ ->
+    (* TODO: we need to handle this properly. There was an error in the upgrade *)
+    assert false
   | Websocket { wsd; _ } ->
       if not (Wsd.is_closed wsd) then begin
         t.error_handler wsd error;
@@ -150,11 +150,7 @@ let read_eof t bs ~off ~len =
 ;;
 
 let yield_reader t f =
-  match t.state with
-  | Uninitialized       -> assert false
-  | Handshake handshake -> Server_handshake.yield_reader handshake f
-  | Websocket _         -> assert false
-;;
+  on_wakeup_reader t f
 
 let next_write_operation t =
   match t.state with
@@ -166,16 +162,7 @@ let next_write_operation t =
 let report_write_result t result =
   match t.state with
   | Uninitialized       -> assert false
-  | Handshake handshake ->
-    begin match Server_handshake.report_write_result handshake result with
-    | `Ok pending_bytes ->
-      if pending_bytes == 0 then begin
-        let websocket_handler = t.websocket_handler in
-        t.state <- Websocket (Server_websocket.create ~websocket_handler);
-        Server_handshake.wakeup_reader handshake
-      end;
-    | _ -> ()
-    end
+  | Handshake handshake -> Server_handshake.report_write_result handshake result
   | Websocket websocket -> Server_websocket.report_write_result websocket result
 ;;
 

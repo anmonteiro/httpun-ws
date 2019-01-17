@@ -46,3 +46,6 @@ let yield_writer t k =
 
 let close { wsd; _ } =
   Wsd.close wsd
+
+let is_closed { wsd; _ } =
+  Wsd.is_closed wsd
