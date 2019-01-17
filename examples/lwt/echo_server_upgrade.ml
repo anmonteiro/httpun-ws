@@ -7,7 +7,7 @@ let connection_handler : Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
   let module Response = Httpaf.Response in
   let module Status = Httpaf.Status in
 
-  let websocket_handler wsd =
+  let websocket_handler _client_address wsd =
     let frame ~opcode ~is_fin:_ bs ~off ~len =
       match opcode with
       | `Continuation
@@ -47,11 +47,15 @@ let connection_handler : Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
     Body.write_string body message;
     Body.close_writer body
   in
-  let request_handler _addr reqd =
-    (Websocketaf_lwt.Server.upgrade_connection
-      ~reqd
+  let upgrade_handler addr socket =
+    Websocketaf_lwt.Server.create_upgraded_connection_handler
       ~error_handler
-      websocket_handler
+      ~websocket_handler
+      addr socket
+    |> Lwt.ignore_result
+  in
+  let request_handler addr reqd =
+    (Websocketaf_lwt.Server.respond_with_upgrade reqd (upgrade_handler addr)
     >|= function
     | Ok () -> ()
     | Error err_str ->
@@ -61,13 +65,11 @@ let connection_handler : Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
       in
       Reqd.respond_with_string reqd response err_str)
     |> Lwt.ignore_result
-
   in
-  Httpaf_lwt.Server.create_connection_handler
+  Httpaf_lwt_unix.Server.create_connection_handler
     ?config:None
     ~request_handler
     ~error_handler:http_error_handler
-
 
 let () =
   let open Lwt.Infix in
@@ -90,4 +92,3 @@ let () =
 
   let forever, _ = Lwt.wait () in
   Lwt_main.run forever
-

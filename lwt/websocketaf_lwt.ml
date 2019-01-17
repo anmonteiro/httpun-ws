@@ -4,7 +4,7 @@ let sha1 s =
   s
   |> Digestif.SHA1.digest_string
   |> Digestif.SHA1.to_raw_string
-  |> B64.encode ~pad:true
+  |> Base64.encode_exn ~pad:true
 
 module Buffer : sig
   type t
@@ -132,6 +132,12 @@ module Server = struct
           Server_connection.report_write_result connection result;
           write_loop_step ()
 
+        | `Upgrade (io_vectors, fn) ->
+          writev io_vectors >>= fun result ->
+          Server_connection.report_write_result connection result;
+          fn socket;
+          write_loop_step ()
+
         | `Yield ->
           Server_connection.yield_writer connection write_loop;
           Lwt.return_unit
@@ -172,24 +178,20 @@ module Server = struct
       let connection =
         Server_connection.create
           ~sha1
-          ~fd:socket
           websocket_handler
       in
       start_read_write_loops ~socket connection
 
+  let create_upgraded_connection_handler ?config:_ ~websocket_handler ~error_handler =
+    fun client_addr socket ->
+      let websocket_handler = websocket_handler client_addr in
+      let connection =
+        Server_connection.create_upgraded ~error_handler ~websocket_handler
+      in
+      start_read_write_loops ~socket connection
 
-  let upgrade_connection ?config:_ ?headers ~reqd ~error_handler websocket_handler =
-    match Server_connection.upgrade
-        ~sha1
-        ~reqd
-        ?headers
-        ~error_handler
-        websocket_handler
-    with
-    | Ok connection ->
-      let socket = Httpaf.Reqd.descriptor reqd in
-      Lwt_result.ok (start_read_write_loops ~socket connection)
-    | Error str -> Lwt.return_error str
+  let respond_with_upgrade ?headers reqd upgrade_handler =
+    Lwt.return (Server_connection.respond_with_upgrade ?headers ~sha1 reqd upgrade_handler)
 end
 
 
