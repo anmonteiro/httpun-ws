@@ -1,20 +1,20 @@
 module IOVec = Httpaf.IOVec
 
-type 'handle state =
+type state =
   | Uninitialized
-  | Handshake of 'handle Server_handshake.t
+  | Handshake of Server_handshake.t
   | Websocket of Server_websocket.t
 
 type input_handlers = Server_websocket.input_handlers =
-  { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Bigstring.t -> off:int -> len:int -> unit
+  { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Bigstringaf.t -> off:int -> len:int -> unit
   ; eof   : unit                                                                          -> unit }
 
 type error = [ `Exn of exn ]
 
 type error_handler = Wsd.t -> error -> unit
 
-type 'handle t =
-  { mutable state: 'handle state
+type t =
+  { mutable state: state
   ; websocket_handler: Wsd.t -> input_handlers
   ; error_handler: error_handler
   }
@@ -29,7 +29,7 @@ let default_error_handler wsd (`Exn exn) =
   Wsd.close wsd
 ;;
 
-let create ~sha1 ~fd ?(error_handler=default_error_handler) websocket_handler =
+let create ~sha1 ?(error_handler=default_error_handler) websocket_handler =
   let t =
     { state = Uninitialized
     ; websocket_handler
@@ -69,11 +69,7 @@ let create ~sha1 ~fd ?(error_handler=default_error_handler) websocket_handler =
       | _ -> ();
     end
   in
-  let handshake =
-    Server_handshake.create
-      ~fd
-      ~request_handler
-  in
+  let handshake = Server_handshake.create ~request_handler in
   t.state <- Handshake handshake;
   t
 
@@ -173,10 +169,11 @@ let report_write_result t result =
   | Handshake handshake ->
     begin match Server_handshake.report_write_result handshake result with
     | `Ok pending_bytes ->
-      if pending_bytes == 0 then
+      if pending_bytes == 0 then begin
         let websocket_handler = t.websocket_handler in
         t.state <- Websocket (Server_websocket.create ~websocket_handler);
         Server_handshake.wakeup_reader handshake
+      end;
     | _ -> ()
     end
   | Websocket websocket -> Server_websocket.report_write_result websocket result

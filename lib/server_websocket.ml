@@ -7,7 +7,7 @@ type t =
 type input_handlers =
   { frame : opcode:Websocket.Opcode.t
           -> is_fin:bool
-          -> Bigstring.t
+          -> Bigstringaf.t
           -> off:int
           -> len:int
           -> unit

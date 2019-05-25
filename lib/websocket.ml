@@ -164,7 +164,7 @@ module Frame = struct
     let length = bits land 0b01111111 in
     if length = 126 then Bigstringaf.unsafe_get_int16_be t (off + 2)                 else
     (* This is technically unsafe, but if somebody's asking us to read 2^63
-     * bytes, then we're already screwd. *)
+     * bytes, then we're already screwed. *)
     if length = 127 then Bigstringaf.unsafe_get_int64_be t (off + 2) |> Int64.to_int else
     length
   ;;

@@ -4,7 +4,7 @@ let sha1 s =
   s
   |> Digestif.SHA1.digest_string
   |> Digestif.SHA1.to_raw_string
-  |> B64.encode ~pad:true
+  |> Base64.encode_exn ~pad:true
 
 module Buffer : sig
   type t
@@ -172,13 +172,12 @@ module Server = struct
       let connection =
         Server_connection.create
           ~sha1
-          ~fd:socket
           websocket_handler
       in
       start_read_write_loops ~socket connection
 
 
-  let upgrade_connection ?config:_ ?headers ~reqd ~error_handler websocket_handler =
+  let upgrade_connection ?config:_ ?headers ~reqd ~error_handler ~websocket_handler socket =
     match Server_connection.upgrade
         ~sha1
         ~reqd
@@ -187,7 +186,6 @@ module Server = struct
         websocket_handler
     with
     | Ok connection ->
-      let socket = Httpaf.Reqd.descriptor reqd in
       Lwt_result.ok (start_read_write_loops ~socket connection)
     | Error str -> Lwt.return_error str
 end

@@ -15,7 +15,7 @@ end
 
 module Server : sig
   val create_connection_handler
-    :  ?config : Httpaf.Server_connection.Config.t
+    :  ?config : Httpaf.Config.t
     -> websocket_handler : ( 'a
                            -> Websocketaf.Wsd.t
                            -> Websocketaf.Server_connection.input_handlers)
@@ -26,10 +26,11 @@ module Server : sig
 
 
   val upgrade_connection
-    :  ?config : Httpaf.Server_connection.Config.t
+    :  ?config : Httpaf.Config.t
     -> ?headers: Httpaf.Headers.t
-    -> reqd : ([`Active], [< Socket.Address.t]) Socket.t Httpaf.Reqd.t
+    -> reqd : Httpaf.Reqd.t
     -> error_handler : Websocketaf.Server_connection.error_handler
-    -> (Websocketaf.Wsd.t -> Websocketaf.Server_connection.input_handlers)
+    -> websocket_handler: (Websocketaf.Wsd.t -> Websocketaf.Server_connection.input_handlers)
+    -> ([`Active], [< Socket.Address.t]) Socket.t
     -> (unit, string) Deferred.Result.t
 end

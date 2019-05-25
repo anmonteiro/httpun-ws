@@ -1,9 +1,7 @@
 open Core
 open Async
 
-let connection_handler
-  : ([< Socket.Address.t] as 'a) -> ([`Active], 'a) Socket.t -> unit Deferred.t
-  =
+let connection_handler socket =
   let module Body = Httpaf.Body in
   let module Headers = Httpaf.Headers in
   let module Reqd = Httpaf.Reqd in
@@ -50,24 +48,25 @@ let connection_handler
     Body.write_string body message;
     Body.close_writer body
   in
-  let request_handler _addr reqd =
+  let request_handler socket _addr reqd =
     Websocketaf_async.Server.upgrade_connection
       ~reqd
       ~error_handler
-      websocket_handler
-    |> Deferred.don't_wait_for
+      ~websocket_handler
+      socket
+    |> ignore
 
   in
   Httpaf_async.Server.create_connection_handler
     ?config:None
-    ~request_handler
+    ~request_handler:(request_handler socket)
     ~error_handler:http_error_handler
 
 let main port max_accepts_per_batch () =
   let where_to_listen = Tcp.Where_to_listen.of_port port in
   Tcp.(Server.create_sock ~on_handler_error:`Raise
       ~backlog:10_000 ~max_connections:10_000 ~max_accepts_per_batch where_to_listen)
-    connection_handler
+    (fun client_addr socket -> connection_handler socket client_addr socket)
   >>= fun _server ->
   Log.Global.printf "Listening on port %i and echoing websocket messages.\n%!" port;
   Deferred.never ()

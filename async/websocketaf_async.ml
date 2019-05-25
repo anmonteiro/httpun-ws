@@ -5,7 +5,7 @@ let sha1 s =
   s
   |> Digestif.SHA1.digest_string
   |> Digestif.SHA1.to_raw_string
-  |> B64.encode ~pad:true
+  |> Base64.encode_exn ~pad:true
 
 (** XXX(seliopou): Replace Angstrom.Buffered with a module like this, while
     also supporting growing the buffer. Clients can use this to buffer and the
@@ -151,15 +151,15 @@ module Server = struct
       ; Ivar.read write_complete ]
 
   let create_connection_handler
-    ?config:(_ : Httpaf.Server_connection.Config.t option)
+    ?config:(_ : Httpaf.Config.t option)
     ~websocket_handler
     ~error_handler:_ =
     fun (client_addr : [< Socket.Address.t]) socket ->
       let websocket_handler = websocket_handler client_addr in
-      let conn = Server_connection.create ~sha1 ~fd:socket websocket_handler in
+      let conn = Server_connection.create ~sha1 websocket_handler in
       start_read_write_loops ~socket conn
 
-  let upgrade_connection ?config:_ ?headers ~reqd ~error_handler websocket_handler =
+  let upgrade_connection ?config:_ ?headers ~reqd ~error_handler ~websocket_handler socket =
     match
       Server_connection.upgrade
         ~sha1
@@ -169,7 +169,6 @@ module Server = struct
         websocket_handler
     with
     | Ok connection ->
-      let socket = Httpaf.Reqd.descriptor reqd in
       start_read_write_loops ~socket connection >>| fun x -> Ok x
     | Error _ as err -> Deferred.return err
 end

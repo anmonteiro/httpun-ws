@@ -1,9 +1,7 @@
 open Core
 open Async
 
-let connection_handler
-  : ([< Socket.Address.t] as 'a) -> ([`Active], 'a) Socket.t -> unit Deferred.t
-  =
+let connection_handler : ([< Socket.Address.t] as 'a) -> ([`Active], 'a) Socket.t -> unit Deferred.t =
   let module Body = Httpaf.Body in
   let module Headers = Httpaf.Headers in
   let module Reqd = Httpaf.Reqd in

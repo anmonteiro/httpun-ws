@@ -1,6 +1,6 @@
 open Lwt.Infix
 
-let connection_handler : Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
+let mk_connection_handler socket =
   let module Body = Httpaf.Body in
   let module Headers = Httpaf.Headers in
   let module Reqd = Httpaf.Reqd in
@@ -47,11 +47,12 @@ let connection_handler : Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
     Body.write_string body message;
     Body.close_writer body
   in
-  let request_handler _addr reqd =
+  let request_handler socket _addr reqd =
     (Websocketaf_lwt.Server.upgrade_connection
       ~reqd
       ~error_handler
-      websocket_handler
+      ~websocket_handler
+      socket
     >|= function
     | Ok () -> ()
     | Error err_str ->
@@ -63,9 +64,9 @@ let connection_handler : Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
     |> Lwt.ignore_result
 
   in
-  Httpaf_lwt.Server.create_connection_handler
+  Httpaf_lwt_unix.Server.create_connection_handler
     ?config:None
-    ~request_handler
+    ~request_handler:(request_handler socket)
     ~error_handler:http_error_handler
 
 
@@ -82,7 +83,7 @@ let () =
 
   Lwt.async begin fun () ->
     Lwt_io.establish_server_with_client_socket
-      listen_address connection_handler
+      listen_address (fun client_addr socket -> mk_connection_handler socket client_addr socket)
     >>= fun _server ->
       Printf.printf "Listening on port %i and echoing websocket messages.\n%!" !port;
       Lwt.return_unit
@@ -90,4 +91,3 @@ let () =
 
   let forever, _ = Lwt.wait () in
   Lwt_main.run forever
-
