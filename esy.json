@@ -1,0 +1,35 @@
+{
+  "name": "websocketaf",
+  "version": "0.1.0",
+  "license": "BSD-3-clause",
+  "repository": "git+https://github.com/anmonteiro/websocketaf",
+  "dependencies": {
+    "ocaml": "4.8.0",
+    "@opam/dune": "*",
+    "@opam/lwt": "*",
+    "@opam/bigstringaf": "*",
+    "@opam/angstrom": "*",
+    "@opam/faraday": "*",
+    "@opam/faraday-async": "*",
+    "@opam/faraday-lwt-unix": "*",
+    "@opam/async": "*",
+    "@opam/httpaf": "*",
+    "@opam/httpaf-lwt": "*",
+    "@opam/httpaf-lwt-unix": "*",
+    "@opam/httpaf-async": "*",
+    "@opam/base64": "*",
+    "@opam/digestif": "*"
+  },
+  "devDependencies": {
+    "@opam/alcotest": "*",
+    "@opam/merlin": "*",
+    "@opam/odoc": "*"
+  },
+  "resolutions": {
+    "@opam/conf-openssl": "esy-packages/esy-openssl#dafe9ad",
+    "@opam/httpaf": "anmonteiro/httpaf:httpaf.opam#372c376",
+    "@opam/httpaf-lwt": "anmonteiro/httpaf:httpaf-lwt.opam#372c376",
+    "@opam/httpaf-lwt-unix": "anmonteiro/httpaf:httpaf-lwt-unix.opam#372c376",
+    "@opam/httpaf-async": "anmonteiro/httpaf:httpaf-async.opam#372c376"
+  }
+}
