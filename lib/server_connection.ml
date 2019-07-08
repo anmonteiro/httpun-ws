@@ -1,7 +1,6 @@
 module IOVec = Httpaf.IOVec
 
 type 'fd state =
-  | Uninitialized
   | Handshake of 'fd Server_handshake.t
   | Websocket of Server_websocket.t
 
@@ -22,7 +21,6 @@ type 'fd t =
 
 let is_closed t =
   match t.state with
-  | Uninitialized -> false
   | Handshake handshake ->
     Server_handshake.is_closed handshake
   | Websocket websocket ->
@@ -36,7 +34,6 @@ let on_wakeup_reader t k =
 
 let wakeup_reader t =
   let fs = !(t.wakeup_reader) in
-  Format.eprintf "crkg %d@."(List.length fs);
   t.wakeup_reader := [];
   List.iter (fun f -> f ()) fs
 
@@ -63,24 +60,16 @@ let respond_with_upgrade ?(headers=Httpaf.Headers.empty) ~sha1 reqd upgrade_hand
     ]
     in
     let headers = Httpaf.Headers.(add_list upgrade_headers (to_list headers)) in
-    let response = Httpaf.(Response.create ~headers `Switching_protocols) in
-    Ok (Httpaf.Reqd.respond_with_upgrade reqd response upgrade_handler)
+    Ok (Httpaf.Reqd.respond_with_upgrade reqd headers upgrade_handler)
   end else
     Error "Didn't pass scrutiny"
 
 let create ~sha1 ?(error_handler=default_error_handler) websocket_handler =
-  let t =
-    { state = Uninitialized
-    ; websocket_handler
-    ; error_handler
-    ; wakeup_reader = ref []
-    }
-  in
-  let upgrade_handler _fd =
+  let rec upgrade_handler _fd =
+    let t = Lazy.force t in
     t.state <- Websocket (Server_websocket.create ~websocket_handler);
     wakeup_reader t
-  in
-  let request_handler reqd =
+  and request_handler reqd =
     match respond_with_upgrade ?headers:None ~sha1 reqd upgrade_handler with
     | Ok () -> ()
     | Error msg ->
@@ -89,10 +78,14 @@ let create ~sha1 ?(error_handler=default_error_handler) websocket_handler =
         `Bad_request)
       in
       Httpaf.Reqd.respond_with_string reqd response msg
+  and t = lazy
+    { state = Handshake (Server_handshake.create ~request_handler)
+    ; websocket_handler
+    ; error_handler
+    ; wakeup_reader = ref []
+    }
   in
-  let handshake = Server_handshake.create ~request_handler in
-  t.state <- Handshake handshake;
-  t
+  Lazy.force t
 
 let create_upgraded ?(error_handler=default_error_handler) ~websocket_handler =
     { state = Websocket (Server_websocket.create ~websocket_handler)
@@ -103,14 +96,12 @@ let create_upgraded ?(error_handler=default_error_handler) ~websocket_handler =
 
 let close t =
   match t.state with
-  | Uninitialized       -> assert false
   | Handshake handshake -> Server_handshake.close handshake
   | Websocket websocket -> Server_websocket.close websocket
 ;;
 
 let set_error_and_handle t error =
   begin match t.state with
-  | Uninitialized -> assert false
   | Handshake _ ->
     (* TODO: we need to handle this properly. There was an error in the upgrade *)
     assert false
@@ -126,7 +117,6 @@ let report_exn t exn =
 
 let next_read_operation t =
   match t.state with
-  | Uninitialized       -> assert false
   | Handshake handshake -> Server_handshake.next_read_operation handshake
   | Websocket websocket ->
     match Server_websocket.next_read_operation websocket with
@@ -137,14 +127,12 @@ let next_read_operation t =
 
 let read t bs ~off ~len =
   match t.state with
-  | Uninitialized       -> assert false
   | Handshake handshake -> Server_handshake.read handshake bs ~off ~len
   | Websocket websocket -> Server_websocket.read websocket bs ~off ~len
 ;;
 
 let read_eof t bs ~off ~len =
   match t.state with
-  | Uninitialized       -> assert false
   | Handshake handshake -> Server_handshake.read_eof handshake bs ~off ~len
   | Websocket websocket -> Server_websocket.read_eof websocket bs ~off ~len
 ;;
@@ -154,21 +142,18 @@ let yield_reader t f =
 
 let next_write_operation t =
   match t.state with
-  | Uninitialized       -> assert false
   | Handshake handshake -> Server_handshake.next_write_operation handshake
   | Websocket websocket -> Server_websocket.next_write_operation websocket
 ;;
 
 let report_write_result t result =
   match t.state with
-  | Uninitialized       -> assert false
   | Handshake handshake -> Server_handshake.report_write_result handshake result
   | Websocket websocket -> Server_websocket.report_write_result websocket result
 ;;
 
 let yield_writer t f =
   match t.state with
-  | Uninitialized       -> assert false
   | Handshake handshake -> Server_handshake.yield_writer handshake f
   | Websocket websocket -> Server_websocket.yield_writer websocket f
 ;;
