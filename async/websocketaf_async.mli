@@ -1,4 +1,3 @@
-open! Core
 open Async
 
 module Client : sig
