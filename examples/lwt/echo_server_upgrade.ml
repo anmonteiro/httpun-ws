@@ -23,7 +23,8 @@ let connection_handler =
         ()
     in
     let eof () =
-      Printf.eprintf "EOF\n%!"
+      Format.eprintf "EOF\n%!";
+      Websocketaf.Wsd.close wsd
     in
     { Websocketaf.Server_connection.frame
     ; eof
@@ -52,7 +53,6 @@ let connection_handler =
       ~error_handler
       ~websocket_handler
       addr socket
-    |> Lwt.ignore_result
   in
   let request_handler addr reqd =
     (Websocketaf_lwt.Server.respond_with_upgrade reqd (upgrade_handler addr)

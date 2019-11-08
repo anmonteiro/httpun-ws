@@ -21,7 +21,8 @@ let connection_handler : Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
         ()
     in
     let eof () =
-      Printf.eprintf "EOF\n%!"
+      Format.eprintf "EOF\n@.";
+      Websocketaf.Wsd.close wsd
     in
     { Websocketaf.Server_connection.frame
     ; eof

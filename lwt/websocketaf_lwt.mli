@@ -25,7 +25,7 @@ module Server : sig
 
   val respond_with_upgrade
   : ?headers : Httpaf.Headers.t
-  -> Lwt_unix.file_descr Httpaf.Reqd.t
-  -> (Lwt_unix.file_descr -> unit)
+  -> (Lwt_unix.file_descr, unit Lwt.t) Httpaf.Reqd.t
+  -> (Lwt_unix.file_descr -> unit Lwt.t)
   -> (unit, string) Lwt_result.t
 end

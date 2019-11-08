@@ -34,7 +34,7 @@ module Server : sig
 
   val respond_with_upgrade
   : ?headers : Httpaf.Headers.t
-  -> ([`Active], [< Socket.Address.t] as 'a) Socket.t Httpaf.Reqd.t
-  -> (([`Active], 'a) Socket.t -> unit)
+  -> (([`Active], [< Socket.Address.t] as 'a) Socket.t, unit Deferred.t) Httpaf.Reqd.t
+  -> (([`Active], 'a) Socket.t -> unit Deferred.t)
   -> (unit, string) Deferred.Result.t
 end

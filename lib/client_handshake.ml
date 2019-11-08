@@ -4,6 +4,7 @@ type t =
   { connection : Httpaf.Client_connection.t
   ; body       : [`write] Httpaf.Body.t }
 
+(* TODO(anmonteiro): yet another argument, `~config` *)
 let create
     ~nonce
     ~host
@@ -20,8 +21,10 @@ let create
     ; "sec-websocket-key"    , nonce
     ] |> Httpaf.Headers.of_list
   in
-  let body, connection =
+  let connection = Httpaf.Client_connection.create ?config:None in
+  let body =
     Httpaf.Client_connection.request
+      connection
       (Httpaf.Request.create ~headers `GET resource)
       ~error_handler
       ~response_handler

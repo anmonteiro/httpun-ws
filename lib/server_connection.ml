@@ -1,7 +1,7 @@
 module IOVec = Httpaf.IOVec
 
-type 'fd state =
-  | Handshake of 'fd Server_handshake.t
+type ('fd, 'io) state =
+  | Handshake of ('fd, 'io) Server_handshake.t
   | Websocket of Server_websocket.t
 
 type input_handlers = Server_websocket.input_handlers =
@@ -12,8 +12,8 @@ type error = [ `Exn of exn ]
 
 type error_handler = Wsd.t -> error -> unit
 
-type 'fd t =
-  { mutable state: 'fd state
+type ('fd, 'io) t =
+  { mutable state: ('fd, 'io) state
   ; websocket_handler: Wsd.t -> input_handlers
   ; error_handler: error_handler
   ; wakeup_reader : (unit -> unit) list ref
@@ -64,11 +64,13 @@ let respond_with_upgrade ?(headers=Httpaf.Headers.empty) ~sha1 reqd upgrade_hand
   end else
     Error "Didn't pass scrutiny"
 
-let create ~sha1 ?(error_handler=default_error_handler) websocket_handler =
+(* TODO(anmonteiro): future is a terrible name for this *)
+let create ~sha1 ~future ?(error_handler=default_error_handler) websocket_handler =
   let rec upgrade_handler _fd =
     let t = Lazy.force t in
     t.state <- Websocket (Server_websocket.create ~websocket_handler);
-    wakeup_reader t
+    wakeup_reader t;
+    future
   and request_handler reqd =
     match respond_with_upgrade ?headers:None ~sha1 reqd upgrade_handler with
     | Ok () -> ()
