@@ -27,9 +27,9 @@
   },
   "resolutions": {
     "@opam/conf-openssl": "esy-packages/esy-openssl#dafe9ad",
-    "@opam/httpaf": "anmonteiro/httpaf:httpaf.opam#b55f239",
-    "@opam/httpaf-lwt": "anmonteiro/httpaf:httpaf-lwt.opam#b55f239",
-    "@opam/httpaf-lwt-unix": "anmonteiro/httpaf:httpaf-lwt-unix.opam#b55f239",
-    "@opam/httpaf-async": "anmonteiro/httpaf:httpaf-async.opam#b55f239"
+    "@opam/httpaf": "anmonteiro/httpaf:httpaf.opam#8888b58",
+    "@opam/httpaf-lwt": "anmonteiro/httpaf:httpaf-lwt.opam#8888b58",
+    "@opam/httpaf-lwt-unix": "anmonteiro/httpaf:httpaf-lwt-unix.opam#8888b58",
+    "@opam/httpaf-async": "anmonteiro/httpaf:httpaf-async.opam#8888b58"
   }
 }
