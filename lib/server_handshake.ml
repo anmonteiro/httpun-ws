@@ -1,6 +1,6 @@
 module IOVec = Httpaf.IOVec
 
-type 'fd t = 'fd Httpaf.Server_connection.t
+type ('fd, 'io) t = ('fd, 'io) Httpaf.Server_connection.t
 
 let create ~request_handler =
   (* TODO: support config too? *)

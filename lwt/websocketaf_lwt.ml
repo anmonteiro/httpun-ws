@@ -100,7 +100,7 @@ module Server = struct
             read_loop_step ()
           end
 
-        | `Yield ->
+        | `Yield | `Upgrade ->
           Server_connection.yield_reader connection read_loop;
           Lwt.return_unit
 
@@ -132,11 +132,10 @@ module Server = struct
           Server_connection.report_write_result connection result;
           write_loop_step ()
 
-        | `Upgrade (io_vectors, fn) ->
+        | `Upgrade (io_vectors, upgrade_handler) ->
           writev io_vectors >>= fun result ->
           Server_connection.report_write_result connection result;
-          fn socket;
-          write_loop_step ()
+          upgrade_handler socket >>= write_loop_step
 
         | `Yield ->
           Server_connection.yield_writer connection write_loop;
@@ -177,6 +176,7 @@ module Server = struct
       let websocket_handler = websocket_handler client_addr in
       let connection =
         Server_connection.create
+          ~future:Lwt.return_unit
           ~sha1
           websocket_handler
       in

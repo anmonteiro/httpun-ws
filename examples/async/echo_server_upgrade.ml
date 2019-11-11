@@ -24,7 +24,8 @@ let connection_handler =
         ()
     in
     let eof () =
-      Log.Global.error "EOF\n%!"
+      Log.Global.error "EOF\n%!";
+      Websocketaf.Wsd.close wsd
     in
     { Websocketaf.Server_connection.frame
     ; eof
@@ -53,7 +54,6 @@ let connection_handler =
       ~error_handler
       ~websocket_handler
       addr socket
-    |> Deferred.don't_wait_for
   in
   let request_handler addr reqd =
     (Websocketaf_async.Server.respond_with_upgrade reqd (upgrade_handler addr)

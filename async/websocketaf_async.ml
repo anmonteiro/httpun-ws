@@ -110,7 +110,7 @@ module Server = struct
             reader_thread ()
         end
 
-      | `Yield  ->
+      | `Yield | `Upgrade ->
         Server_connection.yield_reader connection reader_thread
 
       | `Close ->
@@ -128,11 +128,10 @@ module Server = struct
           Server_connection.report_write_result connection result;
           writer_thread ()
 
-      | `Upgrade (iovecs, fn) ->
+      | `Upgrade (iovecs, upgrade_handler) ->
         writev iovecs >>> fun result ->
           Server_connection.report_write_result connection result;
-          fn socket;
-          writer_thread ()
+          upgrade_handler socket >>> writer_thread
 
       | `Yield ->
         Server_connection.yield_writer connection writer_thread;
@@ -161,7 +160,7 @@ module Server = struct
     ~error_handler:_ =
     fun (client_addr : [< Socket.Address.t]) socket ->
       let websocket_handler = websocket_handler client_addr in
-      let conn = Server_connection.create ~sha1 websocket_handler in
+      let conn = Server_connection.create ~future:Deferred.unit ~sha1 websocket_handler in
       start_read_write_loops ~socket conn
 
   let create_upgraded_connection_handler ?config:_ ~websocket_handler ~error_handler =

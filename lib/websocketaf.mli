@@ -108,7 +108,7 @@ end
 module Server_connection : sig
   module IOVec = Httpaf.IOVec
 
-  type 'fd t
+  type ('fd, 'io) t
 
   type input_handlers =
     { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Bigstringaf.t -> off:int -> len:int -> unit
@@ -120,9 +120,10 @@ module Server_connection : sig
 
   val create
     : sha1 : (string -> string)
+    -> future : 'io
     -> ?error_handler : error_handler
     -> (Wsd.t -> input_handlers)
-    -> _ t
+    -> (_, 'io) t
 
   val create_upgraded
   : ?error_handler:(Wsd.t -> [ `Exn of exn ] -> unit)
@@ -132,14 +133,14 @@ module Server_connection : sig
   val respond_with_upgrade
   : ?headers:Httpaf.Headers.t
   -> sha1:(string -> string)
-  -> 'fd Httpaf.Reqd.t
-  -> ('fd -> unit)
+  -> ('fd, 'io) Httpaf.Reqd.t
+  -> ('fd -> 'io)
   -> (unit, string) result
 
-  val next_read_operation  : _ t -> [ `Read | `Yield | `Close ]
-  val next_write_operation : 'fd t -> [
+  val next_read_operation  : _ t -> [ `Read | `Yield | `Close | `Upgrade ]
+  val next_write_operation : ('fd, 'io) t -> [
     | `Write of Bigstringaf.t IOVec.t list
-    | `Upgrade of Bigstringaf.t IOVec.t list * ('fd -> unit)
+    | `Upgrade of Bigstringaf.t IOVec.t list * ('fd -> 'io)
     | `Yield
     | `Close of int ]
 

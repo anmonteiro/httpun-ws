@@ -2,7 +2,9 @@ module IOVec = Httpaf.IOVec
 
 type t =
   { reader : [`Parse of string list * string] Reader.t
-  ; wsd    : Wsd.t }
+  ; wsd    : Wsd.t
+  ; eof : unit -> unit
+  }
 
 type input_handlers =
   { frame : opcode:Websocket.Opcode.t
@@ -16,9 +18,10 @@ type input_handlers =
 let create ~websocket_handler =
   let mode         = `Server in
   let wsd          = Wsd.create mode in
-  let { frame; _ } = websocket_handler wsd in
+  let { frame; eof } = websocket_handler wsd in
   { reader = Reader.create frame
   ; wsd
+  ; eof
   }
 
 let next_read_operation t =
@@ -31,7 +34,9 @@ let read t bs ~off ~len =
   Reader.read_with_more t.reader bs ~off ~len Incomplete
 
 let read_eof t bs ~off ~len =
-  Reader.read_with_more t.reader bs ~off ~len Complete
+  let r = Reader.read_with_more t.reader bs ~off ~len Complete in
+  t.eof ();
+  r
 
 let report_write_result t result =
   Wsd.report_result t.wsd result
