@@ -1,4 +1,4 @@
-version: 2
+version: 2.1
 
 common_cache_key: &common_cache_key
   key: dependency-cache-{{ checksum "../ocaml-version" }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "websocketaf.opam" }}-{{ checksum "websocketaf-async.opam" }}-{{ checksum "websocketaf-lwt.opam" }}-{{ checksum "websocketaf-lwt.opam" }}
@@ -10,6 +10,10 @@ esy_post_build_cache_key: &esy_post_build_cache_key
   key: esy-post-build-cache-{{ checksum "esy.json" }}-{{ checksum "../esy-checksum" }}-{{ checksum ".circleci/config.yml" }}
 
 opam-steps: &opam-steps
+  parameters:
+    all_tests:
+      type: boolean
+      default: true
   steps:
     - checkout
     - run:
@@ -44,49 +48,77 @@ opam-steps: &opam-steps
         <<: *common_cache_key
         paths:
           - ~/.opam
-    - run:
-        name: 'Test'
-        command: |
-          eval `opam config env`
-          dune build @all
-          dune runtest --no-buffer
+    - when:
+        condition: <<parameters.all_tests>>
+        steps:
+          - run:
+              name: 'Test'
+              command: |
+                eval `opam config env`
+                dune build @all
+                dune runtest --no-buffer
+    - unless:
+        condition: <<parameters.all_tests>>
+        steps:
+          - run:
+              name: 'Test'
+              command: |
+                eval `opam config env`
+                dune build @async/all @lwt/all @examples/lwt/all @examples/async/all # @lwt-unix/all
+                dune runtest --no-buffer
     - run:
         name: 'Check git is clean'
         command: git diff --exit-code
 
 jobs:
-  4.04.2:
+  OCaml-404:
     docker:
-      - image: ocaml/opam2:debian-9-ocaml-4.04
+      - image: ocaml/opam2:debian-10-ocaml-4.04
     environment:
       - TERM: dumb
       - OCAML_VERSION: "4.04.2"
-      - OPAMSOLVERTIMEOUT: "360"
+      - OPAMSOLVERTIMEOUT: "1200"
     <<: *opam-steps
-  4.05.0:
+  OCaml-405:
     docker:
-      - image: ocaml/opam2:debian-9-ocaml-4.05
+      - image: ocaml/opam2:debian-10-ocaml-4.05
     environment:
       - TERM: dumb
       - OCAML_VERSION: "4.05.0"
+      - OPAMSOLVERTIMEOUT: "600"
     <<: *opam-steps
-  4.06.1:
+  OCaml-406:
     docker:
-      - image: ocaml/opam2:debian-9-ocaml-4.06
+      - image: ocaml/opam2:debian-10-ocaml-4.06
     environment:
       - TERM: dumb
       - OCAML_VERSION: "4.06.1"
+      - OPAMSOLVERTIMEOUT: "300"
     <<: *opam-steps
-  4.07.1:
+  OCaml-407:
     docker:
-      - image: ocaml/opam2:debian-9-ocaml-4.07
+      - image: ocaml/opam2:debian-10-ocaml-4.07
     environment:
       - TERM: dumb
       - OCAML_VERSION: "4.07.1"
     <<: *opam-steps
+  OCaml-408:
+    docker:
+      - image: ocaml/opam2:debian-10-ocaml-4.08
+    environment:
+      - TERM: dumb
+      - OCAML_VERSION: "4.08.1"
+    <<: *opam-steps
+  OCaml-409:
+    docker:
+      - image: ocaml/opam2:debian-10-ocaml-4.09
+    environment:
+      - TERM: dumb
+      - OCAML_VERSION: "4.09.0"
+    <<: *opam-steps
   esy:
     docker:
-      - image: circleci/node:11.9
+      - image: circleci/node:12.8
     environment:
       - TERM: dumb
       - NPM_CONFIG_PREFIX: "~/.npm-global"
@@ -103,10 +135,8 @@ jobs:
       - restore_cache:
           <<: *esy_post_build_cache_key
       - run:
-          name: "Install esy + system deps"
-          command: |
-            sudo apt-get install texinfo autotools-dev autoconf
-            npm install -g esy
+          name: "Install esy"
+          command: npm install -g esy
       - run:
           name: 'esy install'
           command: ~/.npm-global/bin/esy install
@@ -134,22 +164,35 @@ workflows:
   version: 2
   build-deploy:
     jobs:
-      - 4.04.2:
+      - OCaml-404:
+          all_tests: false
           filters:
             branches:
               ignore:
                 - gh-pages
-      - 4.05.0:
+      - OCaml-405:
+          all_tests: false
           filters:
             branches:
               ignore:
                 - gh-pages
-      - 4.06.1:
+      - OCaml-406:
+          all_tests: false
           filters:
             branches:
               ignore:
                 - gh-pages
-      - 4.07.1:
+      - OCaml-407:
+          filters:
+            branches:
+              ignore:
+                - gh-pages
+      - OCaml-408:
+          filters:
+            branches:
+              ignore:
+                - gh-pages
+      - OCaml-409:
           filters:
             branches:
               ignore:
