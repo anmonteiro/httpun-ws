@@ -1,31 +1,14 @@
-module Client : sig
-  val connect
-    :  Lwt_unix.file_descr
-    -> nonce             : string
-    -> host              : string
-    -> port              : int
-    -> resource          : string
-    -> error_handler : (Websocketaf.Client_connection.error -> unit)
-    -> websocket_handler : (Websocketaf.Wsd.t -> Websocketaf.Client_connection.input_handlers)
-    -> unit Lwt.t
-end
+module type IO = Websocketaf_lwt_intf.IO
 
-module Server : sig
-  val create_connection_handler
-    :  ?config : Httpaf.Config.t
-    -> websocket_handler : (Unix.sockaddr -> Websocketaf.Wsd.t -> Websocketaf.Server_connection.input_handlers)
-    -> error_handler : (Unix.sockaddr -> Httpaf.Server_connection.error_handler)
-    -> (Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t)
+module type Server = Websocketaf_lwt_intf.Server
 
-  val create_upgraded_connection_handler
-    :  ?config : Httpaf.Config.t
-    -> websocket_handler : (Unix.sockaddr -> Websocketaf.Wsd.t -> Websocketaf.Server_connection.input_handlers)
-    -> error_handler : Websocketaf.Server_connection.error_handler
-    -> (Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t)
+module type Client = Websocketaf_lwt_intf.Client
 
-  val respond_with_upgrade
-  : ?headers : Httpaf.Headers.t
-  -> (Lwt_unix.file_descr, unit Lwt.t) Httpaf.Reqd.t
-  -> (Lwt_unix.file_descr -> unit Lwt.t)
-  -> (unit, string) Lwt_result.t
-end
+(* The function that results from [create_connection_handler] should be passed
+   to [Lwt_io.establish_server_with_client_socket]. For an example, see
+   [examples/lwt_echo_server.ml]. *)
+module Server (Io: IO) : Server with type socket := Io.socket and type addr := Io.addr
+
+(* For an example, see [examples/lwt_get.ml]. *)
+module Client (Io: IO) : Client with type socket := Io.socket
+

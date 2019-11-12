@@ -11,16 +11,19 @@ module Buffer : sig
 
   val create : int -> t
 
-  val get : t -> f:(Lwt_bytes.t -> off:int -> len:int -> int) -> int
-  val put : t -> f:(Lwt_bytes.t -> off:int -> len:int -> int Lwt.t) -> int Lwt.t
+  val get : t -> f:(Bigstringaf.t -> off:int -> len:int -> int) -> int
+  val put
+    :  t
+    -> f:(Bigstringaf.t -> off:int -> len:int -> [ `Eof | `Ok of int ] Lwt.t)
+    -> [ `Eof | `Ok of int ] Lwt.t
 end = struct
   type t =
-    { buffer      : Lwt_bytes.t
+    { buffer      : Bigstringaf.t
     ; mutable off : int
     ; mutable len : int }
 
   let create size =
-    let buffer = Lwt_bytes.create size in
+    let buffer = Bigstringaf.create size in
     { buffer; off = 0; len = 0 }
 
   let compress t =
@@ -30,7 +33,7 @@ end = struct
       t.len <- 0;
     end else if t.off > 0
     then begin
-      Lwt_bytes.blit t.buffer t.off t.buffer 0 t.len;
+      Bigstringaf.blit t.buffer ~src_off:t.off t.buffer ~dst_off:0 ~len:t.len;
       t.off <- 0;
     end
 
@@ -44,39 +47,17 @@ end = struct
 
   let put t ~f =
     compress t;
-    f t.buffer ~off:(t.off + t.len) ~len:(Lwt_bytes.length t.buffer - t.len)
-    >>= fun n ->
-    t.len <- t.len + n;
-    Lwt.return n
+    f t.buffer ~off:(t.off + t.len) ~len:(Bigstringaf.length t.buffer - t.len)
+    >|= function
+      | `Eof -> `Eof
+      | `Ok n as ret ->
+        t.len <- t.len + n;
+        ret
 end
 
+include Websocketaf_lwt_intf
 
-let read fd buffer =
-  Lwt.catch
-    (fun () ->
-      Buffer.put buffer ~f:(fun bigstring ~off ~len ->
-        Lwt_bytes.read fd bigstring off len))
-    (function
-    | Unix.Unix_error (Unix.EBADF, _, _) as exn ->
-      Lwt.fail exn
-    | exn ->
-      Lwt.async (fun () ->
-        Lwt_unix.close fd);
-      Lwt.fail exn)
-
-  >>= fun bytes_read ->
-  if bytes_read = 0 then
-    Lwt.return `Eof
-  else
-    Lwt.return (`Ok bytes_read)
-
-let shutdown socket command =
-  try Lwt_unix.shutdown socket command
-  with Unix.Unix_error (Unix.ENOTCONN, _, _) -> ()
-
-
-
-module Server = struct
+module Server (Io: IO) = struct
   module Server_connection = Websocketaf.Server_connection
 
   let start_read_write_loops ~socket connection =
@@ -87,7 +68,7 @@ module Server = struct
       let rec read_loop_step () =
         match Server_connection.next_read_operation connection with
         | `Read ->
-          read socket read_buffer >>= begin function
+          Buffer.put ~f:(Io.read socket) read_buffer >>= begin function
           | `Eof ->
             Buffer.get read_buffer ~f:(fun bigstring ~off ~len ->
               Server_connection.read_eof connection bigstring ~off ~len)
@@ -106,9 +87,7 @@ module Server = struct
 
         | `Close ->
           Lwt.wakeup_later notify_read_loop_exited ();
-          if not (Lwt_unix.state socket = Lwt_unix.Closed) then begin
-            shutdown socket Unix.SHUTDOWN_RECEIVE
-          end;
+          Io.shutdown_receive socket;
           Lwt.return_unit
       in
 
@@ -121,7 +100,7 @@ module Server = struct
     in
 
 
-    let writev = Faraday_lwt_unix.writev_of_fd socket in
+    let writev = Io.writev socket in
     let write_loop_exited, notify_write_loop_exited = Lwt.wait () in
 
     let rec write_loop () =
@@ -143,9 +122,7 @@ module Server = struct
 
         | `Close _ ->
           Lwt.wakeup_later notify_write_loop_exited ();
-          if not (Lwt_unix.state socket = Lwt_unix.Closed) then begin
-            shutdown socket Unix.SHUTDOWN_SEND
-          end;
+          Io.shutdown_send socket;
           Lwt.return_unit
       in
 
@@ -161,12 +138,7 @@ module Server = struct
     write_loop ();
     Lwt.join [read_loop_exited; write_loop_exited] >>= fun () ->
 
-    if Lwt_unix.state socket <> Lwt_unix.Closed then
-      Lwt.catch
-        (fun () -> Lwt_unix.close socket)
-        (fun _exn -> Lwt.return_unit)
-    else
-      Lwt.return_unit
+    Io.close socket
 
 
   (* TODO: should this error handler be a websocket error handler or an HTTP
@@ -194,9 +166,7 @@ module Server = struct
     Lwt.return (Server_connection.respond_with_upgrade ?headers ~sha1 reqd upgrade_handler)
 end
 
-
-
-module Client = struct
+module Client (Io: IO) = struct
   let connect socket ~nonce ~host ~port ~resource ~error_handler ~websocket_handler =
     let module Client_connection = Websocketaf.Client_connection in
     let connection =
@@ -209,7 +179,7 @@ module Client = struct
       let rec read_loop_step () =
         match Client_connection.next_read_operation connection with
         | `Read ->
-          read socket read_buffer >>= begin function
+          Buffer.put ~f:(Io.read socket) read_buffer >>= begin function
           | `Ok _ ->
             Buffer.get read_buffer ~f:(fun bigstring ~off ~len ->
               Client_connection.read connection bigstring ~off ~len)
@@ -224,9 +194,7 @@ module Client = struct
 
         | `Close ->
           Lwt.wakeup_later notify_read_loop_exited ();
-          if not (Lwt_unix.state socket = Lwt_unix.Closed) then begin
-            shutdown socket Unix.SHUTDOWN_RECEIVE
-          end;
+          Io.shutdown_receive socket;
           Lwt.return_unit
       in
 
@@ -241,7 +209,7 @@ module Client = struct
     in
 
 
-    let writev = Faraday_lwt_unix.writev_of_fd socket in
+    let writev = Io.writev socket in
     let write_loop_exited, notify_write_loop_exited = Lwt.wait () in
 
     let rec write_loop () =
@@ -259,9 +227,7 @@ module Client = struct
 
         | `Close _ ->
           Lwt.wakeup_later notify_write_loop_exited ();
-          if not (Lwt_unix.state socket = Lwt_unix.Closed) then begin
-            shutdown socket Unix.SHUTDOWN_SEND
-          end;
+          Io.shutdown_send socket;
           Lwt.return_unit
       in
 
@@ -279,11 +245,5 @@ module Client = struct
     write_loop ();
 
     Lwt.join [read_loop_exited; write_loop_exited] >>= fun () ->
-
-    if Lwt_unix.state socket <> Lwt_unix.Closed then
-      Lwt.catch
-        (fun () -> Lwt_unix.close socket)
-        (fun _exn -> Lwt.return_unit)
-    else
-      Lwt.return_unit;
+    Io.close socket
 end
