@@ -64,7 +64,7 @@ opam-steps: &opam-steps
               name: 'Test'
               command: |
                 eval `opam config env`
-                dune build @async/all @lwt/all @examples/lwt/all @examples/async/all # @lwt-unix/all
+                dune build @async/all @lwt-unix/all @examples/lwt/all @examples/async/all
                 dune runtest --no-buffer
     - run:
         name: 'Check git is clean'
