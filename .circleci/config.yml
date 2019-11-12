@@ -40,7 +40,7 @@ opam-steps: &opam-steps
           opam pin add httpaf-lwt git+https://github.com/anmonteiro/httpaf#fork
           opam pin add httpaf-lwt-unix git+https://github.com/anmonteiro/httpaf#fork
           opam pin add httpaf-async git+https://github.com/anmonteiro/httpaf#fork
-          opam install -t --deps-only .
+          opam install -t --deps-only --best-effort .
     - run:
         name: 'Clean'
         command: rm -rf ./_build
