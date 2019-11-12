@@ -42,7 +42,7 @@ let connection_handler : Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
     end;
   in
 
-  Websocketaf_lwt.Server.create_connection_handler
+  Websocketaf_lwt_unix.Server.create_connection_handler
     ?config:None
     ~websocket_handler
     ~error_handler
