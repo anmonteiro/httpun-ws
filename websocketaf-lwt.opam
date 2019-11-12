@@ -1,7 +1,8 @@
 opam-version: "2.0"
 name: "websocketaf-lwt"
-maintainer: "Spiros Eliopoulos <spiros@inhabitedtype.com>"
-authors: [ "Andreas Garnæs <andreas.garnaes@gmail.com>" ]
+maintainer: "Antonio Nuno Monteiro <anmonteiro@gmail.com>"
+authors: [ "Andreas Garnæs <andreas.garnaes@gmail.com>"
+           "Antonio Nuno Monteiro <anmonteiro@gmail.com>" ]
 license: "BSD-3-clause"
 homepage: "https://github.com/inhabitedtype/websocketaf"
 bug-reports: "https://github.com/inhabitedtype/websocketaf/issues"
@@ -18,5 +19,9 @@ depends: [
   "lwt"
   "digestif"
   "base64"
+]
+pin-depends: [
+  [ "httpaf.dev" "git+https://github.com/anmonteiro/httpaf.git#fork" ]
+  [ "httpaf-lwt.dev" "git+https://github.com/anmonteiro/httpaf.git#fork" ]
 ]
 synopsis: "Lwt support for websocket/af"
