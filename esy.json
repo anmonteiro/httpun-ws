@@ -31,14 +31,6 @@
     "@opam/httpaf": "anmonteiro/httpaf:httpaf.opam#b8d4eb3",
     "@opam/httpaf-lwt": "anmonteiro/httpaf:httpaf-lwt.opam#b8d4eb3",
     "@opam/httpaf-lwt-unix": "anmonteiro/httpaf:httpaf-lwt-unix.opam#b8d4eb3",
-    "@opam/httpaf-async": "anmonteiro/httpaf:httpaf-async.opam#b8d4eb3",
-    "@opam/merlin": {
-      "source": "ocaml/merlin:merlin.opam#cfc28bd",
-      "override": {
-        "dependencies": {
-          "ocaml": "~4.9.0"
-        }
-      }
-    }
+    "@opam/httpaf-async": "anmonteiro/httpaf:httpaf-async.opam#b8d4eb3"
   }
 }
