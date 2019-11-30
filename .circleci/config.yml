@@ -34,13 +34,14 @@ opam-steps: &opam-steps
     - run:
         name: "Install deps"
         command: |
+          sudo apt-get install -y libgmp-dev
           opam update
           opam install -y dune
           opam pin add httpaf git+https://github.com/anmonteiro/httpaf#fork
           opam pin add httpaf-lwt git+https://github.com/anmonteiro/httpaf#fork
           opam pin add httpaf-lwt-unix git+https://github.com/anmonteiro/httpaf#fork
           opam pin add httpaf-async git+https://github.com/anmonteiro/httpaf#fork
-          opam install -t --deps-only .
+          opam install -t --deps-only --best-effort .
     - run:
         name: 'Clean'
         command: rm -rf ./_build
@@ -64,7 +65,7 @@ opam-steps: &opam-steps
               name: 'Test'
               command: |
                 eval `opam config env`
-                dune build @async/all @lwt/all @examples/lwt/all @examples/async/all # @lwt-unix/all
+                dune build @async/all @lwt-unix/all @examples/lwt/all @examples/async/all
                 dune runtest --no-buffer
     - run:
         name: 'Check git is clean'

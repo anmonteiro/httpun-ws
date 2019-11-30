@@ -1,0 +1,7 @@
+(library
+ (name websocketaf_mirage)
+ (public_name websocketaf-mirage)
+ (libraries faraday-lwt websocketaf websocketaf-lwt lwt mirage-flow
+   conduit-mirage cstruct)
+ (flags
+  (:standard -safe-string)))

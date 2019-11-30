@@ -49,13 +49,13 @@ let connection_handler =
     Body.close_writer body
   in
   let upgrade_handler addr socket =
-    Websocketaf_lwt.Server.create_upgraded_connection_handler
+    Websocketaf_lwt_unix.Server.create_upgraded_connection_handler
       ~error_handler
       ~websocket_handler
       addr socket
   in
   let request_handler addr reqd =
-    (Websocketaf_lwt.Server.respond_with_upgrade reqd (upgrade_handler addr)
+    (Websocketaf_lwt_unix.Server.respond_with_upgrade reqd (upgrade_handler addr)
     >|= function
     | Ok () -> ()
     | Error err_str ->

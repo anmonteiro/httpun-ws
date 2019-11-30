@@ -55,7 +55,7 @@ let () =
     let nonce = "0123456789ABCDEF" in
     let resource = "/" in
     let port = !port in
-    Websocketaf_lwt.Client.connect
+    Websocketaf_lwt_unix.Client.connect
       socket
       ~nonce
       ~host
