@@ -1,31 +1,3 @@
-module Client_handshake : sig
-  module IOVec = Httpaf.IOVec
-
-  type t
-
-  val create
-    :  nonce            : string
-    -> host             : string
-    -> port             : int
-    -> resource         : string
-    -> error_handler    : Httpaf.Client_connection.error_handler
-    -> response_handler : Httpaf.Client_connection.response_handler
-    -> t
-
-  val next_read_operation  : t -> [ `Read | `Close ]
-  val next_write_operation : t -> [
-    | `Write of Bigstringaf.t IOVec.t list
-    | `Yield
-    | `Close of int ]
-
-  val read : t -> Bigstringaf.t -> off:int -> len:int -> int
-  val report_write_result : t -> [`Ok of int | `Closed ] -> unit
-
-  val yield_writer : t -> (unit -> unit) -> unit
-
-  val close : t -> unit
-end
-
 module Wsd : sig
   module IOVec = Httpaf.IOVec
 
@@ -70,9 +42,21 @@ module Wsd : sig
   val when_ready_to_write : t -> (unit -> unit) -> unit
 end
 
-module Client_connection : sig
-  module IOVec = Httpaf.IOVec
+module Handshake : sig
+  val create_request
+    :  nonce:string
+    -> headers:Httpaf.Headers.t
+    -> string
+    -> Httpaf.Request.t
 
+  val create_response_headers
+    :  sha1:(string -> string)
+    -> sec_websocket_key:string
+    -> headers:Httpaf.Headers.t
+    -> Httpaf.Headers.t
+end
+
+module Client_connection : sig
   type t
 
   type error =
@@ -83,21 +67,27 @@ module Client_connection : sig
     { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Bigstringaf.t -> off:int -> len:int -> unit
     ; eof   : unit                                                                          -> unit }
 
-  val create
+  val connect
     :  nonce             : string
-    -> host              : string
-    -> port              : int
-    -> resource          : string
+    -> ?headers          : Httpaf.Headers.t
     -> sha1              : (string -> string)
     -> error_handler     : (error -> unit)
     -> websocket_handler : (Wsd.t -> input_handlers)
+    -> string
     -> t
 
-  val next_read_operation  : t -> [ `Read | `Close ]
-  val next_write_operation : t -> [ `Write of Bigstringaf.t IOVec.t list | `Yield | `Close of int ]
+  val create : websocket_handler : (Wsd.t -> input_handlers) -> t
+
+  val next_read_operation  : t -> [ `Read | `Yield | `Close ]
+  val next_write_operation
+    :  t
+    -> [ `Write of Bigstringaf.t Httpaf.IOVec.t list | `Yield | `Close of int ]
 
   val read : t -> Bigstringaf.t -> off:int -> len:int -> int
   val read_eof : t -> Bigstringaf.t -> off:int -> len:int -> int
+
+  val yield_reader : t -> (unit -> unit) -> unit
+
   val report_write_result : t -> [`Ok of int | `Closed ] -> unit
 
   val yield_writer : t -> (unit -> unit) -> unit
@@ -106,8 +96,6 @@ module Client_connection : sig
 end
 
 module Server_connection : sig
-  module IOVec = Httpaf.IOVec
-
   type ('fd, 'io) t
 
   type input_handlers =
@@ -139,8 +127,8 @@ module Server_connection : sig
 
   val next_read_operation  : _ t -> [ `Read | `Yield | `Close | `Upgrade ]
   val next_write_operation : ('fd, 'io) t -> [
-    | `Write of Bigstringaf.t IOVec.t list
-    | `Upgrade of Bigstringaf.t IOVec.t list * ('fd -> 'io)
+    | `Write of Bigstringaf.t Httpaf.IOVec.t list
+    | `Upgrade of Bigstringaf.t Httpaf.IOVec.t list * ('fd -> 'io)
     | `Yield
     | `Close of int ]
 
