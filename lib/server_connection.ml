@@ -1,4 +1,5 @@
 module IOVec = Httpaf.IOVec
+module Server_handshake = Httpaf.Server_connection
 
 type ('fd, 'io) state =
   | Handshake of ('fd, 'io) Server_handshake.t
@@ -50,17 +51,13 @@ let default_error_handler wsd (`Exn exn) =
 let respond_with_upgrade ?(headers=Httpaf.Headers.empty) ~sha1 reqd upgrade_handler =
   let request = Httpaf.Reqd.request reqd in
   if passes_scrutiny request.headers then begin
-    let key = Httpaf.Headers.get_exn request.headers "sec-websocket-key" in
-    let accept = sha1 (key ^ "258EAFA5-E914-47DA-95CA-C5AB0DC85B11") in
-    let upgrade_headers = Httpaf.Headers.of_list [
-      "Transfer-Encoding",    "chunked";
-      "Upgrade",              "websocket";
-      "Connection",           "upgrade";
-      "Sec-Websocket-Accept", accept;
-    ]
+    let sec_websocket_key =
+      Httpaf.Headers.get_exn request.headers "sec-websocket-key"
     in
-    let headers = Httpaf.Headers.(add_list upgrade_headers (to_list headers)) in
-    Ok (Httpaf.Reqd.respond_with_upgrade reqd headers upgrade_handler)
+    let upgrade_headers =
+      Handshake.create_response_headers ~sha1 ~sec_websocket_key ~headers
+    in
+    Ok (Httpaf.Reqd.respond_with_upgrade reqd upgrade_headers upgrade_handler)
   end else
     Error "Didn't pass scrutiny"
 
@@ -81,7 +78,7 @@ let create ~sha1 ~future ?(error_handler=default_error_handler) websocket_handle
       in
       Httpaf.Reqd.respond_with_string reqd response msg
   and t = lazy
-    { state = Handshake (Server_handshake.create ~request_handler)
+    { state = Handshake (Server_handshake.create request_handler)
     ; websocket_handler
     ; error_handler
     ; wakeup_reader = ref []
@@ -98,7 +95,7 @@ let create_upgraded ?(error_handler=default_error_handler) ~websocket_handler =
 
 let close t =
   match t.state with
-  | Handshake handshake -> Server_handshake.close handshake
+  | Handshake handshake -> Server_handshake.shutdown handshake
   | Websocket websocket -> Server_websocket.close websocket
 ;;
 

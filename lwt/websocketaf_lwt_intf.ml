@@ -86,14 +86,21 @@ end
 module type Client = sig
   type socket
 
+  (* Perform HTTP/1.1 handshake and upgrade to WS. *)
   val connect
-    :  socket
-    -> nonce             : string
+    :  nonce             : string
     -> host              : string
     -> port              : int
     -> resource          : string
     -> error_handler : (Client_connection.error -> unit)
     -> websocket_handler : (Wsd.t -> Client_connection.input_handlers)
+    -> socket
+    -> unit Lwt.t
+
+  (* Starts speaking websockets, doesn't perform the handshake. *)
+  val create
+    :  websocket_handler : (Wsd.t -> Client_connection.input_handlers)
+    -> socket
     -> unit Lwt.t
 end
 

@@ -7,25 +7,16 @@ type t =
 (* TODO(anmonteiro): yet another argument, `~config` *)
 let create
     ~nonce
-    ~host
-    ~port
-    ~resource
+    ~headers
     ~error_handler
     ~response_handler
+    target
   =
-  let headers =
-    [ "upgrade"              , "websocket"
-    ; "connection"           , "upgrade"
-    ; "host"                 , String.concat ":" [ host; string_of_int port ]
-    ; "sec-websocket-version", "13"
-    ; "sec-websocket-key"    , nonce
-    ] |> Httpaf.Headers.of_list
-  in
   let connection = Httpaf.Client_connection.create ?config:None in
   let body =
     Httpaf.Client_connection.request
       connection
-      (Httpaf.Request.create ~headers `GET resource)
+      (Handshake.create_request ~nonce ~headers target)
       ~error_handler
       ~response_handler
   in
@@ -42,6 +33,9 @@ let next_write_operation t =
 
 let read t =
   Httpaf.Client_connection.read t.connection
+
+let yield_reader t =
+  Httpaf.Client_connection.yield_reader t.connection
 
 let report_write_result t =
   Httpaf.Client_connection.report_write_result t.connection

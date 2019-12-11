@@ -167,15 +167,13 @@ module Server (Io: IO) = struct
 end
 
 module Client (Io: IO) = struct
-  let connect socket ~nonce ~host ~port ~resource ~error_handler ~websocket_handler =
-    let module Client_connection = Websocketaf.Client_connection in
-    let connection =
-      Client_connection.create ~nonce ~host ~port ~resource ~sha1 ~error_handler ~websocket_handler in
+  module Client_connection = Websocketaf.Client_connection
 
+  let start_read_write_loops socket connection =
     let read_buffer = Buffer.create 0x1000 in
     let read_loop_exited, notify_read_loop_exited = Lwt.wait () in
 
-    let read_loop () =
+    let rec read_loop () =
       let rec read_loop_step () =
         match Client_connection.next_read_operation connection with
         | `Read ->
@@ -192,6 +190,10 @@ module Client (Io: IO) = struct
             read_loop_step ()
           end
 
+        | `Yield ->
+          Client_connection.yield_reader connection read_loop;
+          Lwt.return_unit
+
         | `Close ->
           Lwt.wakeup_later notify_read_loop_exited ();
           Io.shutdown_receive socket;
@@ -207,7 +209,6 @@ module Client (Io: IO) = struct
             ignore(raise exn);
             Lwt.return_unit))
     in
-
 
     let writev = Io.writev socket in
     let write_loop_exited, notify_write_loop_exited = Lwt.wait () in
@@ -240,10 +241,28 @@ module Client (Io: IO) = struct
             Lwt.return_unit))
     in
 
-
     read_loop ();
     write_loop ();
 
     Lwt.join [read_loop_exited; write_loop_exited] >>= fun () ->
     Io.close socket
+
+  let connect ~nonce ~host ~port ~resource ~error_handler ~websocket_handler socket =
+    let headers = Httpaf.Headers.of_list
+      ["host", String.concat ":" [host; string_of_int port]]
+    in
+    let connection =
+      Client_connection.connect
+        ~nonce
+        ~headers
+        ~sha1
+        ~error_handler
+        ~websocket_handler
+        resource
+    in
+    start_read_write_loops socket connection
+
+  let create ~websocket_handler socket =
+    let connection = Client_connection.create ~websocket_handler in
+    start_read_write_loops socket connection
 end

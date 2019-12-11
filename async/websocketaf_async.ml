@@ -178,12 +178,9 @@ end
 module Client = struct
   module Client_connection = Websocketaf.Client_connection
 
-  let connect socket ~nonce ~host ~port ~resource ~error_handler ~websocket_handler =
-    let fd     = Socket.fd socket in
+  let start_read_write_loops socket conn =
+    let fd = Socket.fd socket in
     let writev = Faraday_async.writev_of_fd fd in
-    let conn =
-      Client_connection.create ~nonce ~host ~port ~resource ~sha1 ~error_handler ~websocket_handler
-    in
     let read_complete = Ivar.create () in
     let buffer = Buffer.create 0x1000 in
     let rec reader_thread () =
@@ -202,6 +199,8 @@ module Client = struct
               |> ignore;
               reader_thread ()
           end
+      | `Yield ->
+        Client_connection.yield_reader conn reader_thread
       | `Close ->
         Ivar.fill read_complete ();
         if not (Fd.is_closed fd)
@@ -234,4 +233,23 @@ module Client = struct
       >>| fun () ->
         if not (Fd.is_closed fd)
         then don't_wait_for (Fd.close fd)
+
+  let connect ~nonce ~host ~port ~resource ~error_handler ~websocket_handler socket =
+    let headers = Httpaf.Headers.of_list
+      ["host", String.concat ~sep:":" [host; string_of_int port]]
+    in
+    let connection =
+      Client_connection.connect
+        ~nonce
+        ~headers
+        ~sha1
+        ~error_handler
+        ~websocket_handler
+        resource
+    in
+    start_read_write_loops socket connection
+
+  let create ~websocket_handler socket =
+    let connection = Client_connection.create ~websocket_handler in
+    start_read_write_loops socket connection
 end

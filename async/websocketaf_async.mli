@@ -1,14 +1,21 @@
 open Async
 
 module Client : sig
+  (* Perform HTTP/1.1 handshake and upgrade to WS. *)
   val connect
-    : ([`Active], [< Socket.Address.t]) Socket.t
-    -> nonce             : string
+    :  nonce             : string
     -> host              : string
     -> port              : int
     -> resource          : string
     -> error_handler : (Websocketaf.Client_connection.error -> unit)
     -> websocket_handler : (Websocketaf.Wsd.t -> Websocketaf.Client_connection.input_handlers)
+    -> ([`Active], [< Socket.Address.t]) Socket.t
+    -> unit Deferred.t
+
+  (* Starts speaking websockets, doesn't perform the handshake. *)
+  val create
+    :  websocket_handler : (Websocketaf.Wsd.t -> Websocketaf.Client_connection.input_handlers)
+    -> ([`Active], [< Socket.Address.t]) Socket.t
     -> unit Deferred.t
 end
 
