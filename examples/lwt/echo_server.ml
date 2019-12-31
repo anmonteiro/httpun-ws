@@ -8,14 +8,16 @@ let connection_handler : Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
   let websocket_handler _ wsd =
     let frame ~opcode ~is_fin:_ bs ~off ~len =
       match opcode with
-      | `Continuation
-      | `Text
       | `Binary ->
+        Websocketaf.Wsd.schedule wsd bs ~kind:`Binary ~off ~len
+      | `Continuation ->
+        Websocketaf.Wsd.schedule wsd bs ~kind:`Continuation ~off ~len
+      | `Text ->
         Websocketaf.Wsd.schedule wsd bs ~kind:`Text ~off ~len
       | `Connection_close ->
         Websocketaf.Wsd.close wsd
       | `Ping ->
-        Websocketaf.Wsd.send_ping wsd
+        Websocketaf.Wsd.send_pong wsd
       | `Pong
       | `Other _ ->
         ()
