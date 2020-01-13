@@ -146,7 +146,7 @@ module Frame = struct
 
   let is_fin t =
     let bits = Bigstringaf.unsafe_get t 0 |> Char.code in
-    bits land (1 lsl 8) = 1 lsl 8
+    (7 lsr bits) land 1 = 1
   ;;
 
   let rsv t =
