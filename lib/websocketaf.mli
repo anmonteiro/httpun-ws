@@ -14,7 +14,7 @@ module Wsd : sig
 
   val schedule
     :  t
-    -> kind:[ `Text | `Binary ]
+    -> kind:[ `Text | `Binary | `Continuation ]
     -> Bigstringaf.t
     -> off:int
     -> len:int
@@ -22,7 +22,7 @@ module Wsd : sig
 
   val send_bytes
     :  t
-    -> kind:[ `Text | `Binary ]
+    -> kind:[ `Text | `Binary | `Continuation ]
     -> Bytes.t
     -> off:int
     -> len:int
