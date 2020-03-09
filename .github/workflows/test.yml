@@ -20,7 +20,4 @@ jobs:
         file: ./nix/ci/test.nix
         nixBuildArgs: --argstr ocamlVersion ${{ matrix.ocamlVersion }}
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
-    - name: Build / Test
-      shell: bash
-
 
