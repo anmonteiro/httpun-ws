@@ -95,6 +95,17 @@ let report_write_result t result =
   | Handshake handshake -> Client_handshake.report_write_result handshake result
   | Websocket websocket -> Client_websocket.report_write_result websocket result
 
+let report_exn t exn =
+  begin match t.state with
+  | Handshake handshake -> Client_handshake.report_exn handshake exn
+  | Websocket _ ->
+      assert false
+      (* if not (Wsd.is_closed wsd) then begin
+        t.error_handler wsd error;
+        shutdown t
+      end; *)
+  end
+
 let yield_reader t f =
   match t.state with
   | Handshake handshake -> Client_handshake.yield_reader handshake f
@@ -105,7 +116,13 @@ let yield_writer t f =
   | Handshake handshake -> Client_handshake.yield_writer handshake f
   | Websocket websocket -> Client_websocket.yield_writer websocket f
 
-let close t =
+
+let is_closed t =
+  match t.state with
+  | Handshake handshake -> Client_handshake.is_closed handshake
+  | Websocket websocket -> Client_websocket.is_closed websocket
+
+let shutdown t =
   match t.state with
   | Handshake handshake -> Client_handshake.close handshake
   | Websocket websocket -> Client_websocket.close websocket

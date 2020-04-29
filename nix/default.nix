@@ -26,7 +26,7 @@ in
   websocketaf-lwt = buildWebsocketaf {
     pname = "websocketaf-lwt";
     doCheck = false;
-    propagatedBuildInputs = [ websocketaf lwt4 digestif ];
+    propagatedBuildInputs = [ gluten-lwt websocketaf lwt4 digestif ];
   };
 
   websocketaf-lwt-unix = buildWebsocketaf {
@@ -36,6 +36,7 @@ in
       websocketaf
       websocketaf-lwt
       faraday-lwt-unix
+      gluten-lwt-unix
     ];
   };
 }

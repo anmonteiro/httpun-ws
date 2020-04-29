@@ -34,30 +34,6 @@
 
 open Websocketaf
 
-module type IO = sig
-  type socket
-  type addr
-
-  (** The region [[off, off + len)] is where read bytes can be written to *)
-  val read
-    :  socket
-    -> Bigstringaf.t
-    -> off:int
-    -> len:int
-    -> [ `Eof | `Ok of int ] Lwt.t
-
-  val writev
-    : socket
-    -> Faraday.bigstring Faraday.iovec list
-    -> [ `Closed | `Ok of int ] Lwt.t
-
-  val shutdown_send : socket -> unit
-
-  val shutdown_receive : socket -> unit
-
-  val close : socket -> unit Lwt.t
-end
-
 module type Server = sig
   type socket
 
@@ -66,20 +42,14 @@ module type Server = sig
   val create_connection_handler
     :  ?config : Httpaf.Config.t
     -> websocket_handler : (addr -> Wsd.t -> Server_connection.input_handlers)
-    -> error_handler : (addr -> Httpaf.Server_connection.error_handler)
+    -> error_handler : (addr -> Websocketaf.Server_connection.error_handler)
     -> (addr -> socket -> unit Lwt.t)
 
   val create_upgraded_connection_handler
     :  ?config : Httpaf.Config.t
     -> websocket_handler : (addr -> Wsd.t -> Server_connection.input_handlers)
-    -> error_handler : Server_connection.error_handler
+    -> error_handler : (addr -> Server_connection.error_handler)
     -> (addr -> socket -> unit Lwt.t)
-
-  val respond_with_upgrade
-  : ?headers : Httpaf.Headers.t
-  -> (socket, unit Lwt.t) Httpaf.Reqd.t
-  -> (socket -> unit Lwt.t)
-  -> (unit, string) Lwt_result.t
 end
 
 
@@ -103,4 +73,3 @@ module type Client = sig
     -> socket
     -> unit Lwt.t
 end
-

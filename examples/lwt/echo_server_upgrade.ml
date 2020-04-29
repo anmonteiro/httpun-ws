@@ -1,4 +1,8 @@
-open Lwt.Infix
+let sha1 s =
+  s
+  |> Digestif.SHA1.digest_string
+  |> Digestif.SHA1.to_raw_string
+  |> Base64.encode_exn ~pad:true
 
 let connection_handler =
   let module Body = Httpaf.Body in
@@ -50,23 +54,25 @@ let connection_handler =
     Body.write_string body message;
     Body.close_writer body
   in
-  let upgrade_handler addr socket =
-    Websocketaf_lwt_unix.Server.create_upgraded_connection_handler
-      ~error_handler
-      ~websocket_handler
-      addr socket
+  let upgrade_handler addr upgrade () =
+    let ws_conn =
+      Websocketaf.Server_connection.create_upgraded
+        ~error_handler
+        ~websocket_handler:(websocket_handler addr)
+    in
+    upgrade
+      (Gluten.make (module Websocketaf.Server_connection) ws_conn)
   in
-  let request_handler addr reqd =
-    (Websocketaf_lwt_unix.Server.respond_with_upgrade reqd (upgrade_handler addr)
-    >|= function
+  let request_handler addr (reqd : Httpaf.Reqd.t Gluten.Reqd.t) =
+    let { Gluten.Reqd.reqd; upgrade  } = reqd in
+    match Websocketaf.Handshake.respond_with_upgrade ~sha1 reqd (upgrade_handler addr upgrade) with
     | Ok () -> ()
     | Error err_str ->
-      let response = Response.create
+        let response = Response.create
         ~headers:(Httpaf.Headers.of_list ["Connection", "close"])
         `Bad_request
-      in
-      Reqd.respond_with_string reqd response err_str)
-    |> Lwt.ignore_result
+    in
+      Reqd.respond_with_string reqd response err_str
   in
   Httpaf_lwt_unix.Server.create_connection_handler
     ?config:None
