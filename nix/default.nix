@@ -19,7 +19,13 @@ in
     websocketaf = buildWebsocketaf {
       pname = "websocketaf";
       buildInputs = [ alcotest ];
-      propagatedBuildInputs = [ angstrom faraday httpaf base64 ];
+      propagatedBuildInputs = [
+        angstrom
+        faraday
+        gluten
+        httpaf
+        base64
+      ];
     };
 
   # These two don't have tests
