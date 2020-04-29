@@ -1,4 +1,3 @@
-
 let create_request ~nonce ~headers target =
   let headers =
     Httpaf.Headers.add_list
@@ -20,3 +19,19 @@ let create_response_headers ~sha1 ~sec_websocket_key ~headers =
   ]
   in
   Httpaf.Headers.add_list headers upgrade_headers
+
+let passes_scrutiny _headers =
+  true (* XXX(andreas): missing! *)
+
+let respond_with_upgrade ?(headers=Httpaf.Headers.empty) ~sha1 reqd upgrade_handler =
+  let request = Httpaf.Reqd.request reqd in
+  if passes_scrutiny request.headers then begin
+    let sec_websocket_key =
+      Httpaf.Headers.get_exn request.headers "sec-websocket-key"
+    in
+    let upgrade_headers =
+      create_response_headers ~sha1 ~sec_websocket_key ~headers
+    in
+    Ok (Httpaf.Reqd.respond_with_upgrade reqd upgrade_headers upgrade_handler)
+  end else
+    Error "Didn't pass scrutiny"

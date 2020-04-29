@@ -23,5 +23,6 @@ depends: [
 pin-depends: [
   [ "httpaf.dev" "git+https://github.com/anmonteiro/httpaf.git#fork" ]
   [ "httpaf-lwt.dev" "git+https://github.com/anmonteiro/httpaf.git#fork" ]
+  [ "websocketaf.dev" "git+https://github.com/anmonteiro/websocketaf.git#fork" ]
 ]
 synopsis: "Lwt support for websocket/af"

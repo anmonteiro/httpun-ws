@@ -1,6 +1,6 @@
 (library
  (name websocketaf_lwt)
  (public_name websocketaf-lwt)
- (libraries websocketaf lwt digestif.ocaml base64)
+ (libraries websocketaf gluten-lwt lwt digestif.ocaml base64)
  (flags
   (:standard -safe-string)))

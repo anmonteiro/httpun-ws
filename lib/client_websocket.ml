@@ -46,5 +46,7 @@ let yield_writer t k =
   end else
     Wsd.when_ready_to_write t.wsd k
 
+let is_closed { wsd; _ } = Wsd.is_closed wsd
+
 let close { wsd; _ } =
   Wsd.close wsd

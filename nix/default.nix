@@ -19,14 +19,20 @@ in
     websocketaf = buildWebsocketaf {
       pname = "websocketaf";
       buildInputs = [ alcotest ];
-      propagatedBuildInputs = [ angstrom faraday httpaf base64 ];
+      propagatedBuildInputs = [
+        angstrom
+        faraday
+        gluten
+        httpaf
+        base64
+      ];
     };
 
   # These two don't have tests
   websocketaf-lwt = buildWebsocketaf {
     pname = "websocketaf-lwt";
     doCheck = false;
-    propagatedBuildInputs = [ websocketaf lwt4 digestif ];
+    propagatedBuildInputs = [ gluten-lwt websocketaf lwt4 digestif ];
   };
 
   websocketaf-lwt-unix = buildWebsocketaf {
@@ -36,6 +42,7 @@ in
       websocketaf
       websocketaf-lwt
       faraday-lwt-unix
+      gluten-lwt-unix
     ];
   };
 }

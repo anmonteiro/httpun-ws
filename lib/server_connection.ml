@@ -1,22 +1,21 @@
 module IOVec = Httpaf.IOVec
-module Server_handshake = Httpaf.Server_connection
+module Server_handshake = Gluten.Server
 
-type ('fd, 'io) state =
-  | Handshake of ('fd, 'io) Server_handshake.t
+type state =
+  | Handshake of Server_handshake.t
   | Websocket of Server_websocket.t
 
 type input_handlers = Server_websocket.input_handlers =
   { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Bigstringaf.t -> off:int -> len:int -> unit
   ; eof   : unit                                                                          -> unit }
 
-type error = [ `Exn of exn ]
+type error = Server_websocket.error
+type error_handler = Server_websocket.error_handler
 
-type error_handler = Wsd.t -> error -> unit
 
-type ('fd, 'io) t =
-  { mutable state: ('fd, 'io) state
+type t =
+  { mutable state: state
   ; websocket_handler: Wsd.t -> input_handlers
-  ; error_handler: error_handler
   ; wakeup_reader : (unit -> unit) list ref
   }
 
@@ -38,38 +37,16 @@ let wakeup_reader t =
   t.wakeup_reader := [];
   List.iter (fun f -> f ()) fs
 
-let passes_scrutiny _headers =
-  true (* XXX(andreas): missing! *)
-
-let default_error_handler wsd (`Exn exn) =
-  let message = Printexc.to_string exn in
-  let payload = Bytes.of_string message in
-  Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
-  Wsd.close wsd
-;;
-
-let respond_with_upgrade ?(headers=Httpaf.Headers.empty) ~sha1 reqd upgrade_handler =
-  let request = Httpaf.Reqd.request reqd in
-  if passes_scrutiny request.headers then begin
-    let sec_websocket_key =
-      Httpaf.Headers.get_exn request.headers "sec-websocket-key"
-    in
-    let upgrade_headers =
-      Handshake.create_response_headers ~sha1 ~sec_websocket_key ~headers
-    in
-    Ok (Httpaf.Reqd.respond_with_upgrade reqd upgrade_headers upgrade_handler)
-  end else
-    Error "Didn't pass scrutiny"
-
-(* TODO(anmonteiro): future is a terrible name for this *)
-let create ~sha1 ~future ?(error_handler=default_error_handler) websocket_handler =
-  let rec upgrade_handler _fd =
+let create ~sha1 ?error_handler websocket_handler =
+  let rec upgrade_handler upgrade () =
     let t = Lazy.force t in
-    t.state <- Websocket (Server_websocket.create ~websocket_handler);
-    wakeup_reader t;
-    future
-  and request_handler reqd =
-    match respond_with_upgrade ?headers:None ~sha1 reqd upgrade_handler with
+    let ws_connection =
+      Server_websocket.create ?error_handler ~websocket_handler in
+    t.state <- Websocket ws_connection;
+    upgrade (Gluten.make (module Server_websocket) ws_connection);
+    wakeup_reader t
+  and request_handler { Gluten.reqd; upgrade } =
+    match Handshake.respond_with_upgrade ?headers:None ~sha1 reqd (upgrade_handler upgrade) with
     | Ok () -> ()
     | Error msg ->
       let response = Httpaf.(Response.create
@@ -78,50 +55,43 @@ let create ~sha1 ~future ?(error_handler=default_error_handler) websocket_handle
       in
       Httpaf.Reqd.respond_with_string reqd response msg
   and t = lazy
-    { state = Handshake (Server_handshake.create request_handler)
+    { state =
+        Handshake
+          (Server_handshake.create_upgradable
+            ~protocol:(module Httpaf.Server_connection)
+            ~create:
+              (Httpaf.Server_connection.create ?config:None ?error_handler:None)
+            request_handler)
     ; websocket_handler
-    ; error_handler
     ; wakeup_reader = ref []
     }
   in
   Lazy.force t
 
-let create_upgraded ?(error_handler=default_error_handler) ~websocket_handler =
-    { state = Websocket (Server_websocket.create ~websocket_handler)
+let create_upgraded ?error_handler ~websocket_handler =
+  { state = Websocket (Server_websocket.create ?error_handler ~websocket_handler)
     ; websocket_handler
-    ; error_handler
     ; wakeup_reader = ref []
     }
 
-let close t =
+let shutdown t =
   match t.state with
   | Handshake handshake -> Server_handshake.shutdown handshake
-  | Websocket websocket -> Server_websocket.close websocket
+  | Websocket websocket -> Server_websocket.shutdown websocket
 ;;
 
-let set_error_and_handle t error =
-  begin match t.state with
+let report_exn t exn =
+  match t.state with
   | Handshake _ ->
     (* TODO: we need to handle this properly. There was an error in the upgrade *)
     assert false
-  | Websocket { wsd; _ } ->
-      if not (Wsd.is_closed wsd) then begin
-        t.error_handler wsd error;
-        close t
-      end;
-  end
-
-let report_exn t exn =
-  set_error_and_handle t (`Exn exn)
+  | Websocket websocket ->
+    Server_websocket.report_exn websocket exn
 
 let next_read_operation t =
   match t.state with
   | Handshake handshake -> Server_handshake.next_read_operation handshake
-  | Websocket websocket ->
-    match Server_websocket.next_read_operation websocket with
-    | `Error (`Parse (_, message)) ->
-      set_error_and_handle t (`Exn (Failure message)); `Close
-    | (`Read | `Close) as operation -> operation
+  | Websocket websocket -> Server_websocket.next_read_operation websocket
 ;;
 
 let read t bs ~off ~len =

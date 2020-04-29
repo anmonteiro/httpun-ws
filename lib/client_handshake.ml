@@ -43,5 +43,12 @@ let report_write_result t =
 let yield_writer t =
   Httpaf.Client_connection.yield_writer t.connection
 
+let report_exn t exn =
+  Httpaf.Client_connection.report_exn t.connection exn
+
+let is_closed t =
+  Httpaf.Client_connection.is_closed t.connection
+
 let close t =
-  Httpaf.Body.close_writer t.body
+  Httpaf.Body.close_writer t.body;
+  Httpaf.Client_connection.shutdown t.connection

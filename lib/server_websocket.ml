@@ -1,9 +1,14 @@
 module IOVec = Httpaf.IOVec
 
+type error = [ `Exn of exn ]
+
+type error_handler = Wsd.t -> error -> unit
+
 type t =
   { reader : [`Parse of string list * string] Reader.t
   ; wsd    : Wsd.t
   ; eof : unit -> unit
+  ; error_handler: error_handler
   }
 
 type input_handlers =
@@ -15,17 +20,37 @@ type input_handlers =
           -> unit
   ; eof   : unit -> unit }
 
-let create ~websocket_handler =
+let default_error_handler wsd (`Exn exn) =
+  let message = Printexc.to_string exn in
+  let payload = Bytes.of_string message in
+  Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
+  Wsd.close wsd
+;;
+
+let create ?(error_handler = default_error_handler) ~websocket_handler =
   let mode         = `Server in
   let wsd          = Wsd.create mode in
   let { frame; eof } = websocket_handler wsd in
   { reader = Reader.create frame
   ; wsd
   ; eof
+  ; error_handler
   }
 
+let shutdown { wsd; _ } =
+  Wsd.close wsd
+
+let set_error_and_handle t error =
+  if not (Wsd.is_closed t.wsd) then begin
+    t.error_handler t.wsd error;
+    shutdown t
+  end
+
 let next_read_operation t =
-  Reader.next t.reader
+  match Reader.next t.reader with
+  | `Error (`Parse (_, message)) ->
+    set_error_and_handle t (`Exn (Failure message)); `Close
+  | (`Read | `Close) as operation -> operation
 
 let next_write_operation t =
   Wsd.next t.wsd
@@ -49,8 +74,10 @@ let yield_writer t k =
   end else
     Wsd.when_ready_to_write t.wsd k
 
-let close { wsd; _ } =
-  Wsd.close wsd
-
 let is_closed { wsd; _ } =
   Wsd.is_closed wsd
+
+let report_exn t exn =
+  set_error_and_handle t (`Exn exn)
+
+let yield_reader _t _f = ()

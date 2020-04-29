@@ -1,6 +1,6 @@
 open Lwt.Infix
 
-let websocket_handler wsd =
+let websocket_handler u wsd =
   let rec input_loop wsd () =
     Lwt_io.(read_line stdin) >>= fun line ->
     let payload = Bytes.of_string line in
@@ -22,7 +22,8 @@ let websocket_handler wsd =
     flush stdout
   in
   let eof () =
-    Printf.eprintf "[EOF]\n%!"
+    Printf.eprintf "[EOF]\n%!";
+    Lwt.wakeup_later u ()
   in
   { Websocketaf.Client_connection.frame
   ; eof
@@ -69,10 +70,11 @@ let () =
         conn
         ~error_handler:(fun _ -> assert false)
         ~response_handler:(fun _response _response_body ->
-          Lwt.ignore_result @@
-          (Websocketaf_lwt_unix.Client.create ~websocket_handler socket >|= fun () ->
-            Httpaf_lwt_unix.Client.shutdown conn;
-            Lwt.wakeup_later u ()))
+          let ws_conn =
+            Websocketaf.Client_connection.create ~websocket_handler:(websocket_handler u)
+          in
+          Httpaf_lwt_unix.Client.upgrade conn
+            (Gluten.make (module Websocketaf.Client_connection) ws_conn))
         upgrade_request
     in
     Httpaf.Body.close_writer request_body;

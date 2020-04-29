@@ -1,5 +1,6 @@
+module IOVec = Httpaf.IOVec
+
 module Wsd : sig
-  module IOVec = Httpaf.IOVec
 
   type mode =
     [ `Client of unit -> int32
@@ -54,6 +55,13 @@ module Handshake : sig
     -> sec_websocket_key:string
     -> headers:Httpaf.Headers.t
     -> Httpaf.Headers.t
+
+  val respond_with_upgrade
+  : ?headers:Httpaf.Headers.t
+  -> sha1:(string -> string)
+  -> Httpaf.Reqd.t
+  -> (unit -> unit)
+  -> (unit, string) result
 end
 
 module Client_connection : sig
@@ -81,7 +89,7 @@ module Client_connection : sig
   val next_read_operation  : t -> [ `Read | `Yield | `Close ]
   val next_write_operation
     :  t
-    -> [ `Write of Bigstringaf.t Httpaf.IOVec.t list | `Yield | `Close of int ]
+    -> [ `Write of Bigstringaf.t IOVec.t list | `Yield | `Close of int ]
 
   val read : t -> Bigstringaf.t -> off:int -> len:int -> int
   val read_eof : t -> Bigstringaf.t -> off:int -> len:int -> int
@@ -92,11 +100,15 @@ module Client_connection : sig
 
   val yield_writer : t -> (unit -> unit) -> unit
 
-  val close : t -> unit
+  val report_exn : t -> exn -> unit
+
+  val is_closed : t -> bool
+
+  val shutdown : t -> unit
 end
 
 module Server_connection : sig
-  type ('fd, 'io) t
+  type t
 
   type input_handlers =
     { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Bigstringaf.t -> off:int -> len:int -> unit
@@ -108,40 +120,33 @@ module Server_connection : sig
 
   val create
     : sha1 : (string -> string)
-    -> future : 'io
     -> ?error_handler : error_handler
     -> (Wsd.t -> input_handlers)
-    -> (_, 'io) t
+    -> t
 
   val create_upgraded
-  : ?error_handler:(Wsd.t -> [ `Exn of exn ] -> unit)
+  : ?error_handler:error_handler
   -> websocket_handler:(Wsd.t -> input_handlers)
-  -> _ t
+  -> t
 
-  val respond_with_upgrade
-  : ?headers:Httpaf.Headers.t
-  -> sha1:(string -> string)
-  -> ('fd, 'io) Httpaf.Reqd.t
-  -> ('fd -> 'io)
-  -> (unit, string) result
-
-  val next_read_operation  : _ t -> [ `Read | `Yield | `Close | `Upgrade ]
-  val next_write_operation : ('fd, 'io) t -> [
-    | `Write of Bigstringaf.t Httpaf.IOVec.t list
-    | `Upgrade of Bigstringaf.t Httpaf.IOVec.t list * ('fd -> 'io)
+  val next_read_operation  : t -> [ `Read | `Yield | `Close ]
+  val next_write_operation : t -> [
+    | `Write of Bigstringaf.t IOVec.t list
     | `Yield
     | `Close of int ]
 
-  val read : _ t -> Bigstringaf.t -> off:int -> len:int -> int
-  val read_eof : _ t -> Bigstringaf.t -> off:int -> len:int -> int
-  val report_write_result : _ t -> [`Ok of int | `Closed ] -> unit
+  val read : t -> Bigstringaf.t -> off:int -> len:int -> int
+  val read_eof : t -> Bigstringaf.t -> off:int -> len:int -> int
+  val report_write_result : t -> [`Ok of int | `Closed ] -> unit
 
-  val report_exn : _ t -> exn -> unit
+  val report_exn : t -> exn -> unit
 
-  val yield_reader : _ t -> (unit -> unit) -> unit
-  val yield_writer : _ t -> (unit -> unit) -> unit
+  val yield_reader : t -> (unit -> unit) -> unit
+  val yield_writer : t -> (unit -> unit) -> unit
 
-  val close : _ t -> unit
+  val is_closed : t -> bool
+
+  val shutdown : t -> unit
 end
 
 module Websocket : sig
