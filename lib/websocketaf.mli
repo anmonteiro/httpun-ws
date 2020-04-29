@@ -132,7 +132,6 @@ module Server_connection : sig
   val next_read_operation  : t -> [ `Read | `Yield | `Close ]
   val next_write_operation : t -> [
     | `Write of Bigstringaf.t IOVec.t list
-    (* | `Upgrade of Bigstringaf.t Httpaf.IOVec.t list * ('fd -> 'io) *)
     | `Yield
     | `Close of int ]
 
