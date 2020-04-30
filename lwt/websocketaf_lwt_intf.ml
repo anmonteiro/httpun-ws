@@ -44,12 +44,6 @@ module type Server = sig
     -> websocket_handler : (addr -> Wsd.t -> Server_connection.input_handlers)
     -> error_handler : (addr -> Websocketaf.Server_connection.error_handler)
     -> (addr -> socket -> unit Lwt.t)
-
-  val create_upgraded_connection_handler
-    :  ?config : Httpaf.Config.t
-    -> websocket_handler : (addr -> Wsd.t -> Server_connection.input_handlers)
-    -> error_handler : (addr -> Server_connection.error_handler)
-    -> (addr -> socket -> unit Lwt.t)
 end
 
 

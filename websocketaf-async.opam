@@ -1,5 +1,5 @@
 opam-version: "2.0"
-name: "websocketaf-lwt"
+name: "websocketaf-async"
 maintainer: "Spiros Eliopoulos <spiros@inhabitedtype.com>"
 authors: [ "Antonio N. Monteiro <anmonteiro@gmail.com>" ]
 license: "BSD-3-clause"
@@ -19,4 +19,4 @@ depends: [
   "digestif"
   "base64"
 ]
-synopsis: "Lwt support for websocket/af"
+synopsis: "Async support for websocket/af"
