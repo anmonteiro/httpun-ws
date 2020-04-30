@@ -6,7 +6,7 @@ module Websocket = struct
   end
 
   let parse_frame serialized_frame =
-    match Angstrom.parse_string Frame.parse serialized_frame with
+    match Angstrom.parse_string ~consume:All Frame.parse serialized_frame with
     | Ok frame -> frame
     | Error err -> Alcotest.fail err
 

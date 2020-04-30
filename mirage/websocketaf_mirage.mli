@@ -35,46 +35,28 @@
 open Websocketaf
 
 module type Server = sig
-  type flow
+  type socket
 
   val create_connection_handler
     :  ?config : Httpaf.Config.t
     -> websocket_handler : (Wsd.t -> Server_connection.input_handlers)
-    -> error_handler : Httpaf.Server_connection.error_handler
-    -> flow
-    -> unit Lwt.t
-
-  val create_upgraded_connection_handler
-    :  ?config : Httpaf.Config.t
-    -> websocket_handler : (Wsd.t -> Server_connection.input_handlers)
     -> error_handler : Server_connection.error_handler
-    -> flow
+    -> socket
     -> unit Lwt.t
-
-  val respond_with_upgrade
-  : ?headers : Httpaf.Headers.t
-  -> (flow, unit Lwt.t) Httpaf.Reqd.t
-  -> (flow -> unit Lwt.t)
-  -> (unit, string) Lwt_result.t
 end
 
-module Server (Flow : Mirage_flow.S) :
-  Server with type flow = Flow.flow
+module Server (Flow : Mirage_flow.S) : Server with type socket = Flow.flow
 
 module Server_with_conduit : sig
-  include Server with type flow = Conduit_mirage.Flow.flow
+  include Server with type socket = Conduit_mirage.Flow.flow
 
   type t = Conduit_mirage.Flow.flow -> unit Lwt.t
 
-  val connect:
-    Conduit_mirage.t ->
-    (Conduit_mirage.server -> t -> unit Lwt.t) Lwt.t
+  val connect
+    :  Conduit_mirage.t
+    -> (Conduit_mirage.server -> t -> unit Lwt.t) Lwt.t
 end
 
-module type Client = sig
-  type flow
+module type Client = Websocketaf_lwt.Client
 
-  include Websocketaf_lwt.Client with type socket := flow
-end
-
-module Client (Flow : Mirage_flow.S) : Client with type flow = Flow.flow
+module Client (Flow : Mirage_flow.S) : Client with type socket = Flow.flow
