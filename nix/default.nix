@@ -15,7 +15,7 @@ in
       src = lib.gitignoreSource ./..;
       doCheck = doCheck;
     } // args);
-    websocketafPackages = {
+    websocketafPackages = rec {
       websocketaf = buildWebsocketaf {
         pname = "websocketaf";
         buildInputs = [ alcotest ];
