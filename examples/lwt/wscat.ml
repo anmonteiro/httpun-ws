@@ -1,11 +1,15 @@
 open Lwt.Infix
 
-let websocket_handler wsd =
+let websocket_handler u wsd =
   let rec input_loop wsd () =
     Lwt_io.(read_line stdin) >>= fun line ->
     let payload = Bytes.of_string line in
     Websocketaf.Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
-    input_loop wsd ()
+    if line = "exit" then begin
+      Websocketaf.Wsd.close wsd;
+      Lwt.return_unit
+    end else
+      input_loop wsd ()
   in
   Lwt.async (input_loop wsd);
   let frame ~opcode:_ ~is_fin:_ bs ~off ~len =
@@ -18,7 +22,8 @@ let websocket_handler wsd =
     flush stdout
   in
   let eof () =
-    Printf.eprintf "[EOF]\n%!"
+    Printf.eprintf "[EOF]\n%!";
+    Lwt.wakeup_later u ()
   in
   { Websocketaf.Client_connection.frame
   ; eof
@@ -52,6 +57,7 @@ let () =
     Lwt_unix.connect socket (List.hd addresses).Unix.ai_addr
     >>= fun () ->
 
+    let p, u = Lwt.wait () in
     let nonce = "0123456789ABCDEF" in
     let resource = "/" in
     let port = !port in
@@ -62,5 +68,5 @@ let () =
       ~port
       ~resource
       ~error_handler
-      ~websocket_handler
+      ~websocket_handler:(websocket_handler u) >>= fun () -> p
   end

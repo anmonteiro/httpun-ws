@@ -2,7 +2,6 @@ let sha1 s =
   s
   |> Digestif.SHA1.digest_string
   |> Digestif.SHA1.to_raw_string
-  |> Base64.encode_exn ~pad:true
 
 let connection_handler =
   let module Body = Httpaf.Body in
@@ -56,7 +55,7 @@ let connection_handler =
   in
   let upgrade_handler addr upgrade () =
     let ws_conn =
-      Websocketaf.Server_connection.create_upgraded
+      Websocketaf.Server_connection.create_websocket
         ~error_handler
         ~websocket_handler:(websocket_handler addr)
     in

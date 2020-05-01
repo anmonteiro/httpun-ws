@@ -18,7 +18,7 @@ depends: [
   "dune" {build}
   "lwt"
   "digestif"
-  "base64"
+  "gluten-lwt" {>= "0.2.0"}
 ]
 pin-depends: [
   [ "httpaf.dev" "git+https://github.com/anmonteiro/httpaf.git#fork" ]

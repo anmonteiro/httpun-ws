@@ -20,6 +20,10 @@ type input_handlers =
           -> unit
   ; eof   : unit -> unit }
 
+let random_int32 () =
+  Random.int32 Int32.max_int
+  (* let mode         = `Client random_int32 in *)
+
 let default_error_handler wsd (`Exn exn) =
   let message = Printexc.to_string exn in
   let payload = Bytes.of_string message in
@@ -27,9 +31,8 @@ let default_error_handler wsd (`Exn exn) =
   Wsd.close wsd
 ;;
 
-let create ?(error_handler = default_error_handler) ~websocket_handler =
-  let mode         = `Server in
-  let wsd          = Wsd.create mode in
+let create ~mode ?(error_handler = default_error_handler) websocket_handler =
+  let wsd = Wsd.create mode in
   let { frame; eof } = websocket_handler wsd in
   { reader = Reader.create frame
   ; wsd

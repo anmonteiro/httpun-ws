@@ -1,6 +1,8 @@
+module Headers = Httpaf.Headers
+
 type state =
   | Handshake of Client_handshake.t
-  | Websocket of Client_websocket.t
+  | Websocket of Websocket_connection.t
 
 type t = { mutable state: state }
 
@@ -8,21 +10,65 @@ type error =
   [ Httpaf.Client_connection.error
   | `Handshake_failure of Httpaf.Response.t * [`read] Httpaf.Body.t ]
 
-type input_handlers = Client_websocket.input_handlers =
-  { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Bigstringaf.t -> off:int -> len:int -> unit
-  ; eof   : unit                                                                            -> unit }
+type input_handlers = Websocket_connection.input_handlers =
+  { frame : opcode:Websocket.Opcode.t
+          -> is_fin:bool
+          -> Bigstringaf.t
+          -> off:int
+          -> len:int
+          -> unit
+  ; eof   : unit -> unit }
 
-let passes_scrutiny ~accept headers =
-  let upgrade              = Httpaf.Headers.get headers "upgrade"    in
-  let connection           = Httpaf.Headers.get headers "connection" in
-  let sec_websocket_accept = Httpaf.Headers.get headers "sec-websocket-accept" in
-  sec_websocket_accept = Some accept
-  && (match upgrade with
-     | None         -> false
-     | Some upgrade -> String.lowercase_ascii upgrade = "websocket")
-  && (match connection with
-     | None            -> false
-     | Some connection -> String.lowercase_ascii connection = "upgrade")
+let passes_scrutiny ~status ~accept headers =
+ (*
+  * The client MUST validate the server's response as follows:
+  *
+  *   1. If the status code received from the server is not 101, the client
+  *      handles the response per HTTP [RFC2616] procedures [...].
+  *
+  *   2. If the response lacks an |Upgrade| header field or the |Upgrade|
+  *      header field contains a value that is not an ASCII case- insensitive
+  *      match for the value "websocket", the client MUST _Fail the WebSocket
+  *      Connection_.
+  *
+  *   3. If the response lacks a |Connection| header field or the |Connection|
+  *      header field doesn't contain a token that is an ASCII case-insensitive
+  *      match for the value "Upgrade", the client MUST _Fail the WebSocket
+  *      Connection_.
+
+  *   4. If the response lacks a |Sec-WebSocket-Accept| header field or
+  *      the |Sec-WebSocket-Accept| contains a value other than the
+  *      base64-encoded SHA-1 of the concatenation of the |Sec-WebSocket-
+  *      Key| (as a string, not base64-decoded) with the string "258EAFA5-
+  *      E914-47DA-95CA-C5AB0DC85B11" but ignoring any leading and
+  *      trailing whitespace, the client MUST _Fail the WebSocket
+  *      Connection_.
+
+  * 5.  If the response includes a |Sec-WebSocket-Extensions| header
+  *     field and this header field indicates the use of an extension
+  *     that was not present in the client's handshake (the server has
+  *     indicated an extension not requested by the client), the client
+  *     MUST _Fail the WebSocket Connection_.  (The parsing of this
+  *     header field to determine which extensions are requested is
+  *     discussed in Section 9.1.)
+  * *)
+ match
+   status,
+   Headers.get_exn headers "upgrade",
+   Headers.get_exn headers "connection",
+   Headers.get_exn headers "sec-websocket-accept"
+   with
+   (* 1 *)
+ | `Switching_protocols, upgrade, connection, sec_websocket_accept ->
+   (* 2 *)
+   Handshake.CI.equal upgrade "websocket" &&
+   (* 3 *)
+   Handshake.CI.equal connection "upgrade" &&
+   (* 4 *)
+   String.equal sec_websocket_accept accept
+   (* TODO(anmonteiro): 5 *)
+  | _ -> false
+  | exception _ -> false
 ;;
 
 let handshake_exn t =
@@ -38,18 +84,23 @@ let connect
     ~websocket_handler
     target
   =
-  let nonce = Base64.encode_exn nonce in
   let rec response_handler response response_body =
+    let { Httpaf.Response.status; headers; _  } = response in
     let t = Lazy.force t in
-    let accept = sha1 (nonce ^ "258EAFA5-E914-47DA-95CA-C5AB0DC85B11") in
-    match response.Httpaf.Response.status with
-    | `Switching_protocols when passes_scrutiny ~accept response.headers ->
+    let nonce = Base64.encode_exn nonce in
+    let accept = Handshake.sec_websocket_key_proof ~sha1 nonce in
+    if passes_scrutiny ~status ~accept headers then begin
       Httpaf.Body.close_reader response_body;
       let handshake = handshake_exn t in
-      t.state <- Websocket (Client_websocket.create ~websocket_handler);
+      t.state <-
+        Websocket
+         (Websocket_connection.create
+          ~mode:(`Client Websocket_connection.random_int32)
+          websocket_handler);
       Client_handshake.close handshake
-    | _                    ->
+    end else
       error_handler (`Handshake_failure(response, response_body))
+
   and t = lazy
     { state = Handshake (Client_handshake.create
         ~nonce
@@ -60,15 +111,19 @@ let connect
   in
   Lazy.force t
 
-(* TODO: Doesn't the Websocket handler need an error handler too?! *)
-let create ~websocket_handler =
-  { state = Websocket (Client_websocket.create ~websocket_handler) }
+let create ?error_handler websocket_handler =
+  { state =
+      Websocket
+        (Websocket_connection.create
+          ~mode:(`Client Websocket_connection.random_int32)
+          ?error_handler
+          websocket_handler) }
 
 let next_read_operation t =
   match t.state with
   | Handshake handshake -> Client_handshake.next_read_operation handshake
   | Websocket websocket ->
-    match Client_websocket.next_read_operation websocket with
+    match Websocket_connection.next_read_operation websocket with
     | `Error (`Parse (_, _message)) ->
         (* TODO(anmonteiro): handle this *)
         assert false
@@ -78,32 +133,27 @@ let next_read_operation t =
 let read t bs ~off ~len =
   match t.state with
   | Handshake handshake -> Client_handshake.read handshake bs ~off ~len
-  | Websocket websocket -> Client_websocket.read websocket bs ~off ~len
+  | Websocket websocket -> Websocket_connection.read websocket bs ~off ~len
 
 let read_eof t bs ~off ~len =
   match t.state with
   | Handshake handshake -> Client_handshake.read handshake bs ~off ~len
-  | Websocket websocket -> Client_websocket.read_eof websocket bs ~off ~len
+  | Websocket websocket -> Websocket_connection.read_eof websocket bs ~off ~len
 
 let next_write_operation t =
   match t.state with
   | Handshake handshake -> Client_handshake.next_write_operation handshake
-  | Websocket websocket -> Client_websocket.next_write_operation websocket
+  | Websocket websocket -> Websocket_connection.next_write_operation websocket
 
 let report_write_result t result =
   match t.state with
   | Handshake handshake -> Client_handshake.report_write_result handshake result
-  | Websocket websocket -> Client_websocket.report_write_result websocket result
+  | Websocket websocket -> Websocket_connection.report_write_result websocket result
 
 let report_exn t exn =
   begin match t.state with
   | Handshake handshake -> Client_handshake.report_exn handshake exn
-  | Websocket _ ->
-      assert false
-      (* if not (Wsd.is_closed wsd) then begin
-        t.error_handler wsd error;
-        shutdown t
-      end; *)
+  | Websocket websocket -> Websocket_connection.report_exn websocket exn
   end
 
 let yield_reader t f =
@@ -114,16 +164,16 @@ let yield_reader t f =
 let yield_writer t f =
   match t.state with
   | Handshake handshake -> Client_handshake.yield_writer handshake f
-  | Websocket websocket -> Client_websocket.yield_writer websocket f
+  | Websocket websocket -> Websocket_connection.yield_writer websocket f
 
 
 let is_closed t =
   match t.state with
   | Handshake handshake -> Client_handshake.is_closed handshake
-  | Websocket websocket -> Client_websocket.is_closed websocket
+  | Websocket websocket -> Websocket_connection.is_closed websocket
 
 let shutdown t =
   match t.state with
   | Handshake handshake -> Client_handshake.close handshake
-  | Websocket websocket -> Client_websocket.close websocket
+  | Websocket websocket -> Websocket_connection.shutdown websocket
 ;;

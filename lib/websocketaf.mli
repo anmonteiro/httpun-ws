@@ -71,7 +71,7 @@ module Client_connection : sig
     [ Httpaf.Client_connection.error
     | `Handshake_failure of Httpaf.Response.t * [`read] Httpaf.Body.t ]
 
-  type input_handlers = Client_websocket.input_handlers =
+  type input_handlers =
     { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Bigstringaf.t -> off:int -> len:int -> unit
     ; eof   : unit                                                                          -> unit }
 
@@ -84,7 +84,9 @@ module Client_connection : sig
     -> string
     -> t
 
-  val create : websocket_handler : (Wsd.t -> input_handlers) -> t
+  val create
+    :  ?error_handler:(Wsd.t -> [`Exn of exn] -> unit)
+    -> (Wsd.t -> input_handlers) -> t
 
   val next_read_operation  : t -> [ `Read | `Yield | `Close ]
   val next_write_operation
@@ -118,13 +120,14 @@ module Server_connection : sig
 
   type error_handler = Wsd.t -> error -> unit
 
+  (* TODO: should take handshake error handler. *)
   val create
     : sha1 : (string -> string)
     -> ?error_handler : error_handler
     -> (Wsd.t -> input_handlers)
     -> t
 
-  val create_upgraded
+  val create_websocket
   : ?error_handler:error_handler
   -> websocket_handler:(Wsd.t -> input_handlers)
   -> t
