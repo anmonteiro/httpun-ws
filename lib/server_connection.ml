@@ -77,7 +77,7 @@ let create ~sha1 ?error_handler websocket_handler =
   in
   Lazy.force t
 
-let create_websocket ?error_handler ~websocket_handler =
+let create_websocket ?error_handler websocket_handler =
   { state =
       Websocket
         (Websocket_connection.create

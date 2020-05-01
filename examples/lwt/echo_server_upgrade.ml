@@ -57,7 +57,7 @@ let connection_handler =
     let ws_conn =
       Websocketaf.Server_connection.create_websocket
         ~error_handler
-        ~websocket_handler:(websocket_handler addr)
+        (websocket_handler addr)
     in
     upgrade
       (Gluten.make (module Websocketaf.Server_connection) ws_conn)

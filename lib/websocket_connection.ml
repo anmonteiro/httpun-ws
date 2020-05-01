@@ -20,9 +20,17 @@ type input_handlers =
           -> unit
   ; eof   : unit -> unit }
 
+(* TODO: this should be passed as an argument from the runtime, to allow for
+ * cryptographically secure random number generation. *)
+(* From RFC6455§5.3:
+ *   The masking key is a 32-bit value chosen at random by the client. When
+ *   preparing a masked frame, the client MUST pick a fresh masking key from
+ *   the set of allowed 32-bit values. The masking key needs to be
+ *   unpredictable; thus, the masking key MUST be derived from a strong source
+ *   of entropy, and the masking key for a given frame MUST NOT make it simple
+ *   for a server/proxy to predict the masking key for a subsequent frame. *)
 let random_int32 () =
   Random.int32 Int32.max_int
-  (* let mode         = `Client random_int32 in *)
 
 let default_error_handler wsd (`Exn exn) =
   let message = Printexc.to_string exn in

@@ -129,7 +129,7 @@ module Server_connection : sig
 
   val create_websocket
   : ?error_handler:error_handler
-  -> websocket_handler:(Wsd.t -> input_handlers)
+  -> (Wsd.t -> input_handlers)
   -> t
 
   val next_read_operation  : t -> [ `Read | `Yield | `Close ]
