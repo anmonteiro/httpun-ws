@@ -18,6 +18,7 @@ depends: [
   "bigstringaf"
   "angstrom" {>= "0.14.0"}
   "faraday"  {>= "0.5.0"}
+  "gluten" {>= "0.2.0"}
   "httpaf"
   "result"
 ]
