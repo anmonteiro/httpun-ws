@@ -60,10 +60,4 @@ module type Client = sig
     -> websocket_handler : (Wsd.t -> Client_connection.input_handlers)
     -> socket
     -> unit Lwt.t
-
-  (* Starts speaking websockets, doesn't perform the handshake. *)
-  val create
-    :  websocket_handler : (Wsd.t -> Client_connection.input_handlers)
-    -> socket
-    -> unit Lwt.t
 end

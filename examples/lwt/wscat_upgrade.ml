@@ -71,7 +71,7 @@ let () =
         ~error_handler:(fun _ -> assert false)
         ~response_handler:(fun _response _response_body ->
           let ws_conn =
-            Websocketaf.Client_connection.create ~websocket_handler:(websocket_handler u)
+            Websocketaf.Client_connection.create (websocket_handler u)
           in
           Httpaf_lwt_unix.Client.upgrade conn
             (Gluten.make (module Websocketaf.Client_connection) ws_conn))

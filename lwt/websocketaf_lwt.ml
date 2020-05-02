@@ -2,7 +2,6 @@ let sha1 s =
   s
   |> Digestif.SHA1.digest_string
   |> Digestif.SHA1.to_raw_string
-  |> Base64.encode_exn ~pad:true
 
 include Websocketaf_lwt_intf
 
@@ -45,15 +44,6 @@ module Client (Client_runtime: Gluten_lwt.Client) = struct
         ~websocket_handler
         resource
     in
-    Lwt.map ignore
-      (Client_runtime.create
-        ~read_buffer_size:0x1000
-        ~protocol:(module Websocketaf.Client_connection)
-        connection
-        socket)
-
-  let create ~websocket_handler socket =
-    let connection = Websocketaf.Client_connection.create ~websocket_handler in
     Lwt.map ignore
       (Client_runtime.create
         ~read_buffer_size:0x1000
