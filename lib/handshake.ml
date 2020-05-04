@@ -103,7 +103,9 @@ let passes_scrutiny ~request_method headers =
    (* 3 *)
    CI.equal upgrade "websocket" &&
    (* 4 *)
-   CI.equal connection "upgrade" &&
+   (List.exists
+     (fun v -> CI.equal (String.trim v) "upgrade")
+     (String.split_on_char ',' connection)) &&
    (* 5 *)
    (try String.length (Base64.decode_exn ~pad:true sec_websocket_key) = 16
     with | _ -> false)
