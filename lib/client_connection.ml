@@ -63,7 +63,9 @@ let passes_scrutiny ~status ~accept headers =
    (* 2 *)
    Handshake.CI.equal upgrade "websocket" &&
    (* 3 *)
-   Handshake.CI.equal connection "upgrade" &&
+   (List.exists
+     (fun v -> Handshake.CI.equal (String.trim v) "upgrade")
+     (String.split_on_char ',' connection)) &&
    (* 4 *)
    String.equal sec_websocket_accept accept
    (* TODO(anmonteiro): 5 *)
