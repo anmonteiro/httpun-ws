@@ -29,16 +29,6 @@ let sec_websocket_key_proof ~sha1 sec_websocket_key =
   in
   Base64.encode_exn ~pad:true (sha1 concatenation)
 
-let create_response_headers ~sha1 ~sec_websocket_key ~headers =
-  let accept = sec_websocket_key_proof ~sha1 sec_websocket_key in
-  let upgrade_headers =
-    [ "Upgrade",              "websocket"
-    ; "Connection",           "upgrade"
-    ; "Sec-Websocket-Accept", accept
-    ]
-  in
-  Headers.add_list headers upgrade_headers
-
 (* Copied from headers.ml in http/af.
  * Compares ASCII strings in a Case Insensitive manner. *)
 module CI = struct
@@ -112,15 +102,24 @@ let passes_scrutiny ~request_method headers =
  | _ -> false
  | exception _ -> false
 
-let respond_with_upgrade ?(headers=Headers.empty) ~sha1 reqd upgrade_handler =
-  let request = Httpaf.Reqd.request reqd in
-  if passes_scrutiny ~request_method:request.meth request.headers then begin
-    let sec_websocket_key =
-      Headers.get_exn request.headers "sec-websocket-key"
-    in
+let upgrade_headers ~sha1 ~request_method headers =
+  if passes_scrutiny ~request_method headers then begin
+    let sec_websocket_key = Headers.get_exn headers "sec-websocket-key" in
+    let accept = sec_websocket_key_proof ~sha1 sec_websocket_key in
     let upgrade_headers =
-      create_response_headers ~sha1 ~sec_websocket_key ~headers
+      [ "Upgrade",              "websocket"
+      ; "Connection",           "upgrade"
+      ; "Sec-Websocket-Accept", accept
+      ]
     in
-    Ok (Httpaf.Reqd.respond_with_upgrade reqd upgrade_headers upgrade_handler)
+    Ok upgrade_headers
   end else
     Error "Didn't pass scrutiny"
+
+let respond_with_upgrade ?(headers=Headers.empty) ~sha1 reqd upgrade_handler =
+  let request = Httpaf.Reqd.request reqd in
+  match upgrade_headers ~sha1 ~request_method:request.meth request.headers with
+  | Ok upgrade_headers ->
+    Httpaf.Reqd.respond_with_upgrade reqd (Headers.add_list headers upgrade_headers) upgrade_handler;
+    Ok ()
+  | Error msg -> Error msg

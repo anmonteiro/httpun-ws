@@ -55,7 +55,7 @@ let create ~sha1 ?error_handler websocket_handler =
       Httpaf.Reqd.respond_with_string reqd response msg
     in
     let ret = Httpaf.Reqd.try_with reqd (fun () ->
-      match Handshake.respond_with_upgrade ?headers:None ~sha1 reqd (upgrade_handler upgrade) with
+      match Handshake.respond_with_upgrade ~sha1 reqd (upgrade_handler upgrade) with
       | Ok () -> ()
       | Error msg -> error msg)
     in
