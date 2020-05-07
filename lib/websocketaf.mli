@@ -50,11 +50,11 @@ module Handshake : sig
     -> string
     -> Httpaf.Request.t
 
-  val create_response_headers
-    :  sha1:(string -> string)
-    -> sec_websocket_key:string
-    -> headers:Httpaf.Headers.t
-    -> Httpaf.Headers.t
+  val upgrade_headers
+  :  sha1:(string -> string)
+  -> request_method:Httpaf.Method.t
+  -> Httpaf.Headers.t
+  -> ((string * string) list, string) result
 
   val respond_with_upgrade
   : ?headers:Httpaf.Headers.t
