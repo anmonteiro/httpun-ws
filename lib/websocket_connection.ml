@@ -83,7 +83,7 @@ let yield_writer t k =
     Wsd.close t.wsd;
     k ()
   end else
-    Wsd.when_ready_to_write t.wsd k
+    Wsd.on_wakeup t.wsd k
 
 let is_closed { wsd; _ } =
   Wsd.is_closed wsd

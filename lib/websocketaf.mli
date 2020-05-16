@@ -35,12 +35,7 @@ module Wsd : sig
   val flushed : t -> (unit -> unit) -> unit
   val close   : t -> unit
 
-  val next : t -> [ `Write of Bigstringaf.t IOVec.t list | `Yield | `Close of int ]
-  val report_result : t -> [`Ok of int | `Closed ] -> unit
-
   val is_closed : t -> bool
-
-  val when_ready_to_write : t -> (unit -> unit) -> unit
 end
 
 module Handshake : sig
