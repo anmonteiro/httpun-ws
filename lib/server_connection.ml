@@ -16,7 +16,6 @@ type error_handler = Websocket_connection.error_handler
 type t =
   { mutable state: state
   ; websocket_handler: Wsd.t -> input_handlers
-  ; wakeup_reader : (unit -> unit) list ref
   }
 
 let is_closed t =
@@ -26,17 +25,6 @@ let is_closed t =
   | Websocket websocket ->
     Websocket_connection.is_closed websocket
 
-let on_wakeup_reader t k =
-  if is_closed t
-  then failwith "called on_wakeup_reader on closed conn"
-  else
-    t.wakeup_reader := k::!(t.wakeup_reader)
-
-let wakeup_reader t =
-  let fs = !(t.wakeup_reader) in
-  t.wakeup_reader := [];
-  List.iter (fun f -> f ()) fs
-
 let create ~sha1 ?error_handler websocket_handler =
   let rec upgrade_handler upgrade () =
     let t = Lazy.force t in
@@ -45,7 +33,6 @@ let create ~sha1 ?error_handler websocket_handler =
     in
     t.state <- Websocket ws_connection;
     upgrade (Gluten.make (module Websocket_connection) ws_connection);
-    wakeup_reader t
   and request_handler { Gluten.reqd; upgrade } =
     let error msg =
       let response = Httpaf.(Response.create
@@ -72,7 +59,6 @@ let create ~sha1 ?error_handler websocket_handler =
               (Httpaf.Server_connection.create ?config:None ?error_handler:None)
             request_handler)
     ; websocket_handler
-    ; wakeup_reader = ref []
     }
   in
   Lazy.force t
@@ -85,7 +71,6 @@ let create_websocket ?error_handler websocket_handler =
            ?error_handler
            websocket_handler)
   ; websocket_handler
-  ; wakeup_reader = ref []
   }
 
 let shutdown t =
@@ -121,7 +106,9 @@ let read_eof t bs ~off ~len =
 ;;
 
 let yield_reader t f =
-  on_wakeup_reader t f
+  match t.state with
+  | Handshake handshake -> Server_handshake.yield_reader handshake f
+  | Websocket _ -> assert false
 
 let next_write_operation t =
   match t.state with
