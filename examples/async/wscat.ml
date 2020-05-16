@@ -41,7 +41,7 @@ let main port host () =
       ~resource
       ~error_handler
       ~websocket_handler
-    (* Deferred.never finished *)
+    >>= fun () -> Deferred.never ()
 
 let () =
   Command.async_spec
@@ -52,4 +52,3 @@ let () =
       +> anon ("Destination Host" %: string)
     ) main
   |> Command.run
-
