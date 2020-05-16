@@ -68,5 +68,6 @@ let () =
       ~port
       ~resource
       ~error_handler
-      ~websocket_handler:(websocket_handler u) >>= fun () -> p
+      ~websocket_handler:(websocket_handler u)
+    >>= fun () -> p
   end

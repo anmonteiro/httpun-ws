@@ -48,6 +48,18 @@ in
     };
 
   in websocketafPackages // (if (lib.versionOlder "4.08" ocaml.version) then {
+    websocketaf-async = buildWebsocketaf {
+      pname = "websocketaf-async";
+      doCheck = false;
+      propagatedBuildInputs = [
+        websocketaf
+        async
+        digestif
+        faraday-async
+        gluten-async
+      ];
+    };
+
     websocketaf-mirage = buildWebsocketaf {
       pname = "websocketaf-mirage";
       doCheck = false;

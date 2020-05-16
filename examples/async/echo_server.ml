@@ -32,17 +32,12 @@ let connection_handler : ([< Socket.Address.t] as 'a) -> ([`Active], 'a) Socket.
     }
   in
 
-  let error_handler _client_address ?request:_ error start_response =
-    let response_body = start_response Headers.empty in
-
-    begin match error with
-    | `Exn exn ->
-      Body.write_string response_body (Exn.to_string exn);
-      Body.write_string response_body "\n";
-
-    | #Status.standard as error ->
-      Body.write_string response_body (Status.default_reason_phrase error)
-    end;
+  let error_handler _client_address wsd (`Exn exn) =
+    let message = Exn.to_string exn in
+    let payload = Bytes.of_string message in
+    Websocketaf.Wsd.send_bytes wsd ~kind:`Text payload ~off:0
+      ~len:(Bytes.length payload);
+    Websocketaf.Wsd.close wsd
   in
 
   Websocketaf_async.Server.create_connection_handler
