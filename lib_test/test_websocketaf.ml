@@ -58,11 +58,50 @@ module Websocket = struct
     let payload = Bytes.to_string (Frame.copy_payload_bytes frame) in
     Alcotest.(check string) "payload" "hello" payload
 
+  let test_parsing_multiple_frames () =
+   let open Websocketaf in
+   let frames_parsed = ref 0 in
+   let websocket_handler wsd =
+     let frame ~opcode ~is_fin:_ bs ~off ~len =
+       match opcode with
+       | `Text ->
+         incr frames_parsed;
+         Websocketaf.Wsd.schedule wsd bs ~kind:`Text ~off ~len
+       | `Binary
+       | `Continuation
+       | `Connection_close
+       | `Ping
+       | `Pong
+       | `Other _ -> assert false
+     in
+     let eof () =
+       Format.eprintf "EOF\n%!";
+       Wsd.close wsd
+     in
+     { Server_connection.frame
+     ; eof
+     }
+   in
+   let t =
+    Server_connection.create_websocket
+     ~error_handler:(fun _ -> assert false)
+     websocket_handler
+   in
+   let frame = serialize_frame ~is_fin:false "hello" in
+   let frames = frame ^ frame in
+   let len = String.length frames in
+   let bs = Bigstringaf.of_string ~off:0 ~len frames in
+   let read = Server_connection.read t bs ~off:0 ~len in
+   Alcotest.(check int) "Reads both frames" len read;
+   Alcotest.(check int) "Both frames parsed and handled" 2 !frames_parsed;
+  ;;
+
   let tests =
     [ "parsing ping frame",  `Quick, test_parsing_ping_frame
     ; "parsing close frame", `Quick, test_parsing_close_frame
     ; "parsing text frame",  `Quick, test_parsing_text_frame
     ; "parsing fin bit",  `Quick, test_parsing_fin_bit
+    ; "parse 2 frames in a payload", `Quick, test_parsing_multiple_frames
     ]
 end
 

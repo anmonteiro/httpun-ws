@@ -46,7 +46,7 @@ let schedule t ~kind payload ~off ~len =
 
 let send_bytes t ~kind payload ~off ~len =
   let mask = mask t in
-  Websocket.Frame.schedule_serialize_bytes t.faraday ?mask ~is_fin:true ~opcode:(kind :> Websocket.Opcode.t) ~payload ~off ~len;
+  Websocket.Frame.serialize_bytes t.faraday ?mask ~is_fin:true ~opcode:(kind :> Websocket.Opcode.t) ~payload ~off ~len;
   wakeup t
 
 let send_ping t =
