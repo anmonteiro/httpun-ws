@@ -13,12 +13,12 @@ type 'error t =
 let create frame_handler =
   let parser =
     let open Angstrom in
-    Websocket.Frame.parse
-    >>| fun frame ->
-      let is_fin = Websocket.Frame.is_fin frame in
-      let opcode = Websocket.Frame.opcode frame in
-      Websocket.Frame.unmask_inplace frame;
-      Websocket.Frame.with_payload frame ~f:(frame_handler ~opcode ~is_fin)
+    skip_many
+      (Websocket.Frame.parse <* commit >>| fun frame ->
+        let is_fin = Websocket.Frame.is_fin frame in
+        let opcode = Websocket.Frame.opcode frame in
+        Websocket.Frame.unmask_inplace frame;
+        Websocket.Frame.with_payload frame ~f:(frame_handler ~opcode ~is_fin))
   in
   { parser
   ; parse_state = Done

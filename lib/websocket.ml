@@ -322,13 +322,4 @@ module Frame = struct
     end;
     Faraday.write_bytes faraday payload ~off ~len;
   ;;
-
-  let schedule_serialize_bytes ?mask faraday ~is_fin ~opcode ~payload ~off ~len =
-    serialize_headers faraday ?mask ~is_fin ~opcode ~payload_length:len;
-    begin match mask with
-    | None -> ()
-    | Some mask -> apply_mask_bytes mask payload ~off ~len
-    end;
-    Faraday.write_bytes faraday payload ~off ~len;
-  ;;
 end

@@ -246,16 +246,6 @@ module Websocket : sig
       -> len:int
       -> unit
 
-    val schedule_serialize_bytes
-      :  ?mask:int32
-      -> Faraday.t
-      -> is_fin:bool
-      -> opcode:Opcode.t
-      -> payload:Bytes.t
-      -> off:int
-      -> len:int
-      -> unit
-
     val serialize_bytes
       :  ?mask:int32
       -> Faraday.t
