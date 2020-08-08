@@ -17,7 +17,9 @@ in
     buildWebsocketaf = args: buildDunePackage ({
       version = "0.0.1-dev";
       useDune2 = true;
-      doCheck = doCheck;
+      # There's a bug in the OCaml compiler:
+      # https://github.com/ocaml/ocaml/pull/2256
+      doCheck = doCheck && ocamlVersion != "4_07";
     } // args);
     websocketafPackages = rec {
       websocketaf = buildWebsocketaf {
