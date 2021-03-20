@@ -60,9 +60,9 @@ let send_pong t =
 let flushed t f = Faraday.flush t.faraday f
 
 let close ?code t =
-  let mask = mask t in
   let () = match code with
   | Some code -> 
+    let mask = mask t in
     let payload = Bytes.create 2 in
     Bytes.set_uint16_be payload 0 (Websocket.Close_code.to_int code);
     Websocket.Frame.serialize_bytes t.faraday ?mask ~is_fin:true ~opcode:`Connection_close ~payload ~off:0 ~len:2;
