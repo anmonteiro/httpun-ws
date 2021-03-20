@@ -27,17 +27,17 @@ let mask t =
 let is_closed t =
   Faraday.is_closed t.faraday
 
-  let on_wakeup t k =
-    if Faraday.is_closed t.faraday
-    then failwith "on_wakeup on closed writer"
-    else if Optional_thunk.is_some t.wakeup
-    then failwith "on_wakeup: only one callback can be registered at a time"
-    else t.wakeup <- Optional_thunk.some k
+let on_wakeup t k =
+  if Faraday.is_closed t.faraday
+  then failwith "on_wakeup on closed writer"
+  else if Optional_thunk.is_some t.wakeup
+  then failwith "on_wakeup: only one callback can be registered at a time"
+  else t.wakeup <- Optional_thunk.some k
 
-  let wakeup t =
-    let f = t.wakeup in
-    t.wakeup <- Optional_thunk.none;
-    Optional_thunk.call_if_some f
+let wakeup t =
+  let f = t.wakeup in
+  t.wakeup <- Optional_thunk.none;
+  Optional_thunk.call_if_some f
 
 let schedule t ~kind payload ~off ~len =
   let mask = mask t in
@@ -59,8 +59,11 @@ let send_pong t =
 
 let flushed t f = Faraday.flush t.faraday f
 
-let close t =
-  Websocket.Frame.serialize_control t.faraday ~opcode:`Connection_close;
+let close ?(code=`Normal_closure) t =
+  let mask = mask t in
+  let payload = Bytes.create 2 in
+  Bytes.set_uint16_be payload 0 (Websocket.Close_code.to_int code);
+  Websocket.Frame.serialize_bytes t.faraday ?mask ~is_fin:true ~opcode:`Connection_close ~payload ~off:0 ~len:2;
   Faraday.close t.faraday;
   wakeup t
 
