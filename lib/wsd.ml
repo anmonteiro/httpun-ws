@@ -27,17 +27,17 @@ let mask t =
 let is_closed t =
   Faraday.is_closed t.faraday
 
-let on_wakeup t k =
-  if Faraday.is_closed t.faraday
-  then failwith "on_wakeup on closed writer"
-  else if Optional_thunk.is_some t.wakeup
-  then failwith "on_wakeup: only one callback can be registered at a time"
-  else t.wakeup <- Optional_thunk.some k
+  let on_wakeup t k =
+    if Faraday.is_closed t.faraday
+    then failwith "on_wakeup on closed writer"
+    else if Optional_thunk.is_some t.wakeup
+    then failwith "on_wakeup: only one callback can be registered at a time"
+    else t.wakeup <- Optional_thunk.some k
 
-let wakeup t =
-  let f = t.wakeup in
-  t.wakeup <- Optional_thunk.none;
-  Optional_thunk.call_if_some f
+  let wakeup t =
+    let f = t.wakeup in
+    t.wakeup <- Optional_thunk.none;
+    Optional_thunk.call_if_some f
 
 let schedule t ~kind payload ~off ~len =
   let mask = mask t in
