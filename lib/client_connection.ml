@@ -13,8 +13,7 @@ type error =
 type input_handlers = Websocket_connection.input_handlers =
   { frame : opcode:Websocket.Opcode.t
           -> is_fin:bool
-          -> Bigstringaf.t
-          -> off:int
+          -> Websocket.Payload.t
           -> len:int
           -> unit
   ; eof   : unit -> unit }

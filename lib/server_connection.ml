@@ -6,8 +6,8 @@ type state =
   | Websocket of Websocket_connection.t
 
 type input_handlers = Websocket_connection.input_handlers =
-  { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Bigstringaf.t -> off:int -> len:int -> unit
-  ; eof   : unit                                                                          -> unit }
+  { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Websocket.Payload.t -> len:int -> unit
+  ; eof   : unit                                                                       -> unit }
 
 type error = Websocket_connection.error
 type error_handler = Websocket_connection.error_handler
