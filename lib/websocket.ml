@@ -378,7 +378,7 @@ module Frame = struct
       { headers; payload }
   ;;
 
-  let serialize_headers faraday ?mask ~is_fin ~opcode ~payload_length =
+  let serialize_headers ?mask faraday ~is_fin ~opcode ~payload_length =
     let opcode = Opcode.to_int opcode in
     let is_fin = if is_fin then 1 lsl 7 else 0 in
     let is_mask =

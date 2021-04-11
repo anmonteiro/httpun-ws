@@ -72,7 +72,7 @@ module Websocket : sig
     val empty : t
 
     val is_closed : t -> bool
-    
+
     val schedule_read :
       t ->
       on_eof:(unit -> unit) ->
@@ -80,7 +80,7 @@ module Websocket : sig
       unit
 
     val is_read_scheduled : t -> bool
-    
+
     val close : t -> unit
   end
 
@@ -95,8 +95,6 @@ module Websocket : sig
     val has_mask : t -> bool
     val mask     : t -> int32 option
     val mask_exn : t -> int32
-
-    val length : t -> int
 
     val payload : t -> Payload.t
     val payload_length : t -> int
@@ -162,7 +160,7 @@ module Wsd : sig
   val send_pong : t -> unit
 
   val flushed : t -> (unit -> unit) -> unit
-  val close   : t -> unit
+  val close   : ?code:Websocket.Close_code.t -> t -> unit
 
   val is_closed : t -> bool
 end
