@@ -62,28 +62,6 @@ module Websocket : sig
     val of_int_exn : int -> t
   end
 
-  module Payload : sig
-    type t
-
-    val of_faraday : Faraday.t -> t
-
-    val create : Bigstringaf.t -> t
-
-    val empty : t
-
-    val is_closed : t -> bool
-
-    val schedule_read :
-      t ->
-      on_eof:(unit -> unit) ->
-      on_read:(Bigstringaf.t -> off:int -> len:int -> unit) ->
-      unit
-
-    val is_read_scheduled : t -> bool
-
-    val close : t -> unit
-  end
-
   module Frame : sig
     type t
 
@@ -125,6 +103,28 @@ module Websocket : sig
       -> len:int
       -> unit
   end
+end
+
+module Payload : sig
+  type t
+
+  val of_faraday : Faraday.t -> t
+
+  val create : Bigstringaf.t -> t
+
+  val empty : t
+
+  val is_closed : t -> bool
+
+  val schedule_read :
+    t ->
+    on_eof:(unit -> unit) ->
+    on_read:(Bigstringaf.t -> off:int -> len:int -> unit) ->
+    unit
+
+  val is_read_scheduled : t -> bool
+
+  val close : t -> unit
 end
 
 module Wsd : sig
@@ -194,8 +194,8 @@ module Client_connection : sig
     | `Handshake_failure of Httpaf.Response.t * [`read] Httpaf.Body.t ]
 
   type input_handlers =
-    { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Websocket.Payload.t -> len:int -> unit
-    ; eof   : unit                                                                          -> unit }
+    { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Payload.t -> len:int -> unit
+    ; eof   : unit                                                             -> unit }
 
   val connect
     :  nonce             : string
@@ -235,8 +235,8 @@ module Server_connection : sig
   type t
 
   type input_handlers =
-    { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Websocket.Payload.t -> len:int -> unit
-    ; eof   : unit                                                                          -> unit }
+    { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Payload.t -> len:int -> unit
+    ; eof   : unit                                                             -> unit }
 
   type error = [ `Exn of exn ]
 
