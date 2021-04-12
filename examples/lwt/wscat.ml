@@ -12,15 +12,18 @@ let websocket_handler u wsd =
       input_loop wsd ()
   in
   Lwt.async (input_loop wsd);
-  let frame ~opcode:_ ~is_fin:_ bs ~off ~len =
+  let frame ~opcode:_ ~is_fin:_ ~len:_ payload =
+    Websocketaf.Payload.schedule_read payload
+      ~on_eof:ignore
+      ~on_read:(fun bs ~off ~len ->
     let payload = Bytes.create len in
     Lwt_bytes.blit_to_bytes
       bs off
       payload 0
       len;
-    Printf.printf "%s\n" (Bytes.unsafe_to_string payload);
-    flush stdout
+    Format.printf "%s@." (Bytes.unsafe_to_string payload);)
   in
+
   let eof () =
     Printf.eprintf "[EOF]\n%!";
     Lwt.wakeup_later u ()

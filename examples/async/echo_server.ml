@@ -9,12 +9,15 @@ let connection_handler : ([< Socket.Address.t] as 'a) -> ([`Active], 'a) Socket.
   let module Status = Httpaf.Status in
 
   let websocket_handler _ wsd =
-    let frame ~opcode ~is_fin:_ bs ~off ~len =
+    let frame ~opcode ~is_fin:_ ~len:_ payload =
       match opcode with
       | `Continuation
       | `Text
       | `Binary ->
-        Websocketaf.Wsd.schedule wsd bs ~kind:`Text ~off ~len
+         Websocketaf.Payload.schedule_read payload
+           ~on_eof:ignore
+           ~on_read:(fun bs ~off ~len ->
+           Websocketaf.Wsd.schedule wsd bs ~kind:`Text ~off ~len)
       | `Connection_close ->
         Websocketaf.Wsd.close wsd
       | `Ping ->

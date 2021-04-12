@@ -11,14 +11,13 @@ let connection_handler =
   let module Status = Httpaf.Status in
 
   let websocket_handler _client_address wsd =
-    let frame ~opcode ~is_fin:_ bs ~off ~len =
-      match opcode with
-      | `Binary ->
-        Websocketaf.Wsd.schedule wsd bs ~kind:`Binary ~off ~len
-      | `Continuation ->
-        Websocketaf.Wsd.schedule wsd bs ~kind:`Continuation ~off ~len
-      | `Text ->
-        Websocketaf.Wsd.schedule wsd bs ~kind:`Text ~off ~len
+    let frame ~opcode ~is_fin:_ ~len:_ payload =
+      match (opcode: Websocketaf.Websocket.Opcode.t) with
+      | #Websocketaf.Websocket.Opcode.standard_non_control as opcode ->
+        Websocketaf.Payload.schedule_read payload
+          ~on_eof:ignore
+          ~on_read:(fun bs ~off ~len ->
+          Websocketaf.Wsd.schedule wsd bs ~kind:opcode ~off ~len)
       | `Connection_close ->
         Websocketaf.Wsd.close wsd
       | `Ping ->
