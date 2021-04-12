@@ -69,5 +69,5 @@ let () =
       ~resource
       ~error_handler
       ~websocket_handler:(websocket_handler u)
-    >>= fun () -> p
+    >>= fun _client -> p
   end
