@@ -61,12 +61,6 @@ module IOVec = Httpaf.IOVec
 
   let empty = create_empty ()
 
-  let write_bigstring t ?off ?len b =
-    Faraday.write_bigstring ?off ?len t.faraday b
-
-  let schedule_bigstring t ?off ?len b =
-    Faraday.schedule_bigstring ?off ?len t.faraday b
-
   let is_closed t =
     Faraday.is_closed t.faraday
 

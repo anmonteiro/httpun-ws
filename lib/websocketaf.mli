@@ -108,12 +108,6 @@ end
 module Payload : sig
   type t
 
-  val of_faraday : Faraday.t -> t
-
-  val create : Bigstringaf.t -> t
-
-  val empty : t
-
   val is_closed : t -> bool
 
   val schedule_read :
@@ -121,8 +115,6 @@ module Payload : sig
     on_eof:(unit -> unit) ->
     on_read:(Bigstringaf.t -> off:int -> len:int -> unit) ->
     unit
-
-  val is_read_scheduled : t -> bool
 
   val close : t -> unit
 end

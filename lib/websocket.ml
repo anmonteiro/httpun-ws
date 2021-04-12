@@ -251,9 +251,12 @@ module Frame = struct
 
   let payload_parser t =
     let open Angstrom in
-    let unmask = match mask t with
-    | None -> Sys.opaque_identity (fun a -> a)
-    | Some mask -> (fun bs -> apply_mask mask bs; bs)
+    let unmask t bs =
+      match mask t with
+      | None -> bs
+      | Some mask ->
+        apply_mask mask bs;
+        bs
     in
     let finish payload =
       let open Angstrom in
@@ -262,13 +265,11 @@ module Frame = struct
     in
     let schedule_size payload n =
       let open Angstrom in
-      (* XXX(seliopou): performance regression due to switching to a single output
-       * format in Farady. Once a specialized operation is exposed to avoid the
-       * intemediate copy, this should be back to the original performance. *)
-      (* XXX(quartz55): does this still apply? (25 March 2021) *)
       begin if Payload.is_closed payload
       then advance n
-      else take_bigstring n >>| fun s -> Payload.write_bigstring payload (unmask s)
+      else take_bigstring n >>| fun bs ->
+        let faraday = Payload.unsafe_faraday payload in
+        Faraday.schedule_bigstring faraday (unmask t bs)
       end *> commit
     in
     let rec read_exact n =
