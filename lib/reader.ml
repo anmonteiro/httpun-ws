@@ -13,12 +13,15 @@ type 'error t =
 let create frame_handler =
   let parser =
     let open Angstrom in
+    let buf = Bigstringaf.create 0x1000 in
     skip_many
-      (Websocket.Frame.parse <* commit >>| fun frame ->
+      (Websocket.Frame.parse ~buf <* commit >>= fun frame ->
+        let payload = Websocket.Frame.payload frame in
         let is_fin = Websocket.Frame.is_fin frame in
         let opcode = Websocket.Frame.opcode frame in
-        Websocket.Frame.unmask_inplace frame;
-        Websocket.Frame.with_payload frame ~f:(frame_handler ~opcode ~is_fin))
+        let len = Websocket.Frame.payload_length frame in
+        frame_handler ~opcode ~is_fin ~len payload;
+        Websocket.Frame.payload_parser frame)
   in
   { parser
   ; parse_state = Done
