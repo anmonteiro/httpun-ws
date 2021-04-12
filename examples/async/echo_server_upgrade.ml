@@ -14,22 +14,23 @@ let connection_handler =
   let module Status = Httpaf.Status in
 
   let websocket_handler _client_address wsd =
-    let frame ~opcode ~is_fin:_ bs ~off ~len =
-      match opcode with
-      | `Continuation
-      | `Text
-      | `Binary ->
-        Websocketaf.Wsd.schedule wsd bs ~kind:`Text ~off ~len
+    let frame ~opcode ~is_fin:_ ~len:_ payload =
+      match (opcode: Websocketaf.Websocket.Opcode.t) with
+      | #Websocketaf.Websocket.Opcode.standard_non_control as opcode ->
+        Websocketaf.Payload.schedule_read payload
+          ~on_eof:ignore
+          ~on_read:(fun bs ~off ~len ->
+          Websocketaf.Wsd.schedule wsd bs ~kind:opcode ~off ~len)
       | `Connection_close ->
         Websocketaf.Wsd.close wsd
       | `Ping ->
-        Websocketaf.Wsd.send_ping wsd
+        Websocketaf.Wsd.send_pong wsd
       | `Pong
       | `Other _ ->
         ()
     in
     let eof () =
-      Log.Global.error "EOF\n%!";
+      Format.eprintf "EOF\n%!";
       Websocketaf.Wsd.close wsd
     in
     { Websocketaf.Server_connection.frame

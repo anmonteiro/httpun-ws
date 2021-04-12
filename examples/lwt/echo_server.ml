@@ -5,15 +5,14 @@ let connection_handler : Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
   let module Response = Httpaf.Response in
   let module Status = Httpaf.Status in
 
-  let websocket_handler _ wsd =
-    let frame ~opcode ~is_fin:_ bs ~off ~len =
-      match opcode with
-      | `Binary ->
-        Websocketaf.Wsd.schedule wsd bs ~kind:`Binary ~off ~len
-      | `Continuation ->
-        Websocketaf.Wsd.schedule wsd bs ~kind:`Continuation ~off ~len
-      | `Text ->
-        Websocketaf.Wsd.schedule wsd bs ~kind:`Text ~off ~len
+  let websocket_handler _client_address wsd =
+    let frame ~opcode ~is_fin:_ ~len:_ payload =
+      match (opcode: Websocketaf.Websocket.Opcode.t) with
+      | #Websocketaf.Websocket.Opcode.standard_non_control as opcode ->
+        Websocketaf.Payload.schedule_read payload
+          ~on_eof:ignore
+          ~on_read:(fun bs ~off ~len ->
+          Websocketaf.Wsd.schedule wsd bs ~kind:opcode ~off ~len)
       | `Connection_close ->
         Websocketaf.Wsd.close wsd
       | `Ping ->
@@ -23,7 +22,7 @@ let connection_handler : Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
         ()
     in
     let eof () =
-      Format.eprintf "EOF\n@.";
+      Format.eprintf "EOF\n%!";
       Websocketaf.Wsd.close wsd
     in
     { Websocketaf.Server_connection.frame

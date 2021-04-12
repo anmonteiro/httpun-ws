@@ -11,10 +11,14 @@ let websocket_handler wsd =
     | `Eof -> assert false
   in
   Deferred.don't_wait_for (input_loop wsd ());
-  let frame ~opcode:_ ~is_fin:_ bs ~off ~len =
-    let payload = Bigstring.to_bytes ~pos:off ~len bs in
-    Log.Global.printf "%s\n%!" (Bytes.to_string payload);
+  let frame ~opcode:_ ~is_fin:_ ~len:_ payload =
+    Websocketaf.Payload.schedule_read payload
+      ~on_eof:ignore
+      ~on_read:(fun bs ~off ~len ->
+    let payload = Bytes.to_string (Bigstring.to_bytes ~pos:off ~len bs) in
+    Log.Global.printf "%s\n%!" payload)
   in
+
   let eof () =
     Log.Global.error "[EOF]\n%!"
   in
