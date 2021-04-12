@@ -29,9 +29,12 @@ module Server (Server_runtime: Gluten_lwt.Server) = struct
 end
 
 module Client (Client_runtime: Gluten_lwt.Client) = struct
+  type t = Client_runtime.t
   type socket = Client_runtime.socket
 
-  let connect ~nonce ~host ~port ~resource ~error_handler ~websocket_handler socket =
+  let connect
+      ?(config=Httpaf.Config.default)
+      ~nonce ~host ~port ~resource ~error_handler ~websocket_handler socket =
     let headers = Httpaf.Headers.of_list
       ["host", String.concat ":" [host; string_of_int port]]
     in
@@ -44,10 +47,11 @@ module Client (Client_runtime: Gluten_lwt.Client) = struct
         ~websocket_handler
         resource
     in
-    Lwt.map ignore
-      (Client_runtime.create
-        ~read_buffer_size:0x1000
-        ~protocol:(module Websocketaf.Client_connection)
-        connection
-        socket)
+    Client_runtime.create
+      ~read_buffer_size:config.read_buffer_size
+      ~protocol:(module Websocketaf.Client_connection)
+      connection
+      socket
+
+  let is_closed t = Client_runtime.is_closed t
 end

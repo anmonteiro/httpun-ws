@@ -48,16 +48,20 @@ end
 
 
 module type Client = sig
+  type t
   type socket
 
   (* Perform HTTP/1.1 handshake and upgrade to WS. *)
   val connect
-    :  nonce             : string
+    :  ?config : Httpaf.Config.t
+    -> nonce             : string
     -> host              : string
     -> port              : int
     -> resource          : string
     -> error_handler : (Client_connection.error -> unit)
     -> websocket_handler : (Wsd.t -> Client_connection.input_handlers)
     -> socket
-    -> unit Lwt.t
+    -> t Lwt.t
+
+  val is_closed : t -> bool
 end
