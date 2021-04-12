@@ -12,11 +12,7 @@ type t =
   }
 
 type input_handlers =
-  { frame : opcode:Websocket.Opcode.t
-          -> is_fin:bool
-          -> Payload.t
-          -> len:int
-          -> unit
+  { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> len:int -> Payload.t -> unit
   ; eof   : unit -> unit }
 
 (* TODO: this should be passed as an argument from the runtime, to allow for

@@ -289,7 +289,7 @@ module Frame = struct
     >>= fun () -> finish t.payload
   ;;
 
-  let parse ?(buf=Bigstringaf.empty) () =
+  let parse ~buf =
     let open Angstrom in
     parse_headers
     >>| fun headers ->

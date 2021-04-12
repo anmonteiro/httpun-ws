@@ -6,7 +6,12 @@ module Websocket = struct
   end
 
   let parse_frame serialized_frame =
-    match Angstrom.parse_string ~consume:All Frame.parse serialized_frame with
+    let parser =
+      let open Angstrom in
+      (Frame.parse ~buf:Bigstringaf.empty) >>= fun frame ->
+        lift (fun () -> frame) (Frame.payload_parser frame)
+    in
+    match Angstrom.parse_string ~consume:All parser serialized_frame with
     | Ok frame -> frame
     | Error err -> Alcotest.fail err
 
@@ -36,6 +41,16 @@ module Websocket = struct
     Alcotest.(check int) "length" (Frame.length frame) 2;
     Alcotest.(check bool) "is_fin" true (Frame.is_fin frame)
 
+  let read_payload frame =
+    let rev_payload_chunks = ref [] in
+    let payload = Frame.payload frame in
+    Websocketaf.Payload.schedule_read payload
+      ~on_eof:ignore
+      ~on_read:(fun bs ~off ~len ->
+      rev_payload_chunks := Bigstringaf.substring bs ~off ~len :: !rev_payload_chunks
+    );
+    !rev_payload_chunks
+
   let test_parsing_text_frame () =
     let frame = parse_frame "\129\139\086\057\046\216\103\011\029\236\099\015\025\224\111\009\036" in
     Alcotest.check Testable.opcode "opcode" `Text (Frame.opcode frame);
@@ -43,10 +58,9 @@ module Websocket = struct
     Alcotest.(check int32) "mask" 1446588120l (Frame.mask_exn frame);
     Alcotest.(check int) "payload_length" (Frame.payload_length frame) 11;
     Alcotest.(check int) "length" (Frame.length frame) 17;
-    Frame.unmask_inplace frame;
+    let rev_payload_chunks = read_payload frame in
     Alcotest.(check bool) "is_fin" true (Frame.is_fin frame);
-    let payload = Bytes.to_string (Frame.copy_payload_bytes frame) in
-    Alcotest.(check string) "payload" "1234567890\n" payload
+    Alcotest.(check (list string)) "payload" ["1234567890\n"] rev_payload_chunks
 
   let test_parsing_fin_bit () =
    let frame = parse_frame (serialize_frame ~is_fin:false "hello") in
@@ -55,18 +69,21 @@ module Websocket = struct
    let frame = parse_frame (serialize_frame ~is_fin:true "hello") in
     Alcotest.check Testable.opcode "opcode" `Text (Frame.opcode frame);
     Alcotest.(check bool) "is_fin" true (Frame.is_fin frame);
-    let payload = Bytes.to_string (Frame.copy_payload_bytes frame) in
-    Alcotest.(check string) "payload" "hello" payload
+    let rev_payload_chunks = read_payload frame in
+    Alcotest.(check (list string)) "payload" ["hello"] rev_payload_chunks
 
   let test_parsing_multiple_frames () =
    let open Websocketaf in
    let frames_parsed = ref 0 in
    let websocket_handler wsd =
-     let frame ~opcode ~is_fin:_ bs ~off ~len =
+     let frame ~opcode ~is_fin:_ ~len:_ payload =
        match opcode with
        | `Text ->
          incr frames_parsed;
-         Websocketaf.Wsd.schedule wsd bs ~kind:`Text ~off ~len
+         Websocketaf.Payload.schedule_read payload
+           ~on_eof:ignore
+           ~on_read:(fun bs ~off ~len ->
+           Websocketaf.Wsd.schedule wsd bs ~kind:`Text ~off ~len)
        | `Binary
        | `Continuation
        | `Connection_close

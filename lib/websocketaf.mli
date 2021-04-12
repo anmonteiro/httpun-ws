@@ -1,5 +1,19 @@
 module IOVec = Httpaf.IOVec
 
+module Payload : sig
+  type t
+
+  val is_closed : t -> bool
+
+  val schedule_read :
+    t ->
+    on_eof:(unit -> unit) ->
+    on_read:(Bigstringaf.t -> off:int -> len:int -> unit) ->
+    unit
+
+  val close : t -> unit
+end
+
 module Websocket : sig
   module Opcode : sig
     type standard_non_control =
@@ -78,7 +92,7 @@ module Websocket : sig
     val payload_length : t -> int
     val length : t -> int
 
-    val parse : ?buf:Bigstringaf.t -> unit -> t Angstrom.t
+    val parse : buf:Bigstringaf.t -> t Angstrom.t
     val payload_parser : t -> unit Angstrom.t
 
     val serialize_control : ?mask:int32 -> Faraday.t -> opcode:Opcode.standard_control -> unit
@@ -103,20 +117,6 @@ module Websocket : sig
       -> len:int
       -> unit
   end
-end
-
-module Payload : sig
-  type t
-
-  val is_closed : t -> bool
-
-  val schedule_read :
-    t ->
-    on_eof:(unit -> unit) ->
-    on_read:(Bigstringaf.t -> off:int -> len:int -> unit) ->
-    unit
-
-  val close : t -> unit
 end
 
 module Wsd : sig
@@ -186,8 +186,8 @@ module Client_connection : sig
     | `Handshake_failure of Httpaf.Response.t * [`read] Httpaf.Body.t ]
 
   type input_handlers =
-    { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Payload.t -> len:int -> unit
-    ; eof   : unit                                                             -> unit }
+    { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> len:int -> Payload.t -> unit
+    ; eof   : unit -> unit }
 
   val connect
     :  nonce             : string
@@ -227,8 +227,8 @@ module Server_connection : sig
   type t
 
   type input_handlers =
-    { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> Payload.t -> len:int -> unit
-    ; eof   : unit                                                             -> unit }
+    { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> len:int -> Payload.t -> unit
+    ; eof   : unit -> unit }
 
   type error = [ `Exn of exn ]
 

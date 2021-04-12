@@ -15,12 +15,12 @@ let create frame_handler =
     let open Angstrom in
     let buf = Bigstringaf.create 0x1000 in
     skip_many
-      (Websocket.Frame.parse ~buf () <* commit >>= fun frame ->
+      (Websocket.Frame.parse ~buf <* commit >>= fun frame ->
         let payload = Websocket.Frame.payload frame in
         let is_fin = Websocket.Frame.is_fin frame in
         let opcode = Websocket.Frame.opcode frame in
         let len = Websocket.Frame.payload_length frame in
-        frame_handler ~opcode ~is_fin payload ~len;
+        frame_handler ~opcode ~is_fin ~len payload;
         Websocket.Frame.payload_parser frame)
   in
   { parser
