@@ -8,7 +8,7 @@ type t = { mutable state: state }
 
 type error =
   [ Httpaf.Client_connection.error
-  | `Handshake_failure of Httpaf.Response.t * [`read] Httpaf.Body.t ]
+  | `Handshake_failure of Httpaf.Response.t * Httpaf.Body.Reader.t ]
 
 type input_handlers = Websocket_connection.input_handlers =
   { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> len:int -> Payload.t -> unit
@@ -87,7 +87,7 @@ let connect
     let nonce = Base64.encode_exn nonce in
     let accept = Handshake.sec_websocket_key_proof ~sha1 nonce in
     if passes_scrutiny ~status ~accept headers then begin
-      Httpaf.Body.close_reader response_body;
+      Httpaf.Body.Reader.close response_body;
       let handshake = handshake_exn t in
       t.state <-
         Websocket

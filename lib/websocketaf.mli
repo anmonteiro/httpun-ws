@@ -183,7 +183,7 @@ module Client_connection : sig
 
   type error =
     [ Httpaf.Client_connection.error
-    | `Handshake_failure of Httpaf.Response.t * [`read] Httpaf.Body.t ]
+    | `Handshake_failure of Httpaf.Response.t * Httpaf.Body.Reader.t ]
 
   type input_handlers =
     { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> len:int -> Payload.t -> unit

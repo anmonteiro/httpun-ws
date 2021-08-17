@@ -2,7 +2,7 @@ module IOVec = Httpaf.IOVec
 
 type t =
   { connection : Httpaf.Client_connection.t
-  ; body       : [`write] Httpaf.Body.t }
+  ; body       : Httpaf.Body.Writer.t }
 
 (* TODO(anmonteiro): yet another argument, `~config` *)
 let create
@@ -50,5 +50,5 @@ let is_closed t =
   Httpaf.Client_connection.is_closed t.connection
 
 let close t =
-  Httpaf.Body.close_writer t.body;
+  Httpaf.Body.Writer.close t.body;
   Httpaf.Client_connection.shutdown t.connection
