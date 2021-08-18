@@ -79,6 +79,6 @@ let () =
             (Gluten.make (module Websocketaf.Client_connection) ws_conn))
         upgrade_request
     in
-    Httpaf.Body.close_writer request_body;
+    Httpaf.Body.Writer.close request_body;
     p
   end

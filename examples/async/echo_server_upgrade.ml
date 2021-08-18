@@ -52,8 +52,8 @@ let connection_handler =
       | (#Status.client_error | #Status.server_error) as error -> Status.to_string error
     in
     let body = handle Headers.empty in
-    Body.write_string body message;
-    Body.close_writer body
+    Body.Writer.write_string body message;
+    Body.Writer.close body
   in
   let upgrade_handler addr upgrade () =
     let ws_conn =
