@@ -18,9 +18,6 @@ let
   buildWebsocketaf = args: buildDunePackage ({
     version = "0.0.1-dev";
     useDune2 = true;
-    # There's a bug in the OCaml compiler:
-    # https://github.com/ocaml/ocaml/pull/2256
-    doCheck = doCheck && ocamlVersion != "4_07";
   } // args);
   websocketafPackages = rec {
     websocketaf = buildWebsocketaf {
@@ -75,7 +72,7 @@ websocketafPackages // (if (lib.versionOlder "4.08" ocaml.version) then {
       files = [ "websocketaf-async.opam" ];
     };
     doCheck = false;
-    propagatedBuildInputs = [
+    propagatedBuildInputs = with websocketafPackages; [
       websocketaf
       async
       digestif
