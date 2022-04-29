@@ -21,11 +21,13 @@ stdenv.mkDerivation {
       ocaml
       dune
       findlib
+      alcotest
       httpaf-lwt-unix
       httpaf-async
     ]);
   doCheck = true;
   checkPhase = ''
+    dune runtest
     dune build @examples/all --display=progress
   '';
 }

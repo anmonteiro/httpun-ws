@@ -3,16 +3,14 @@
 let
   overlays =
     builtins.fetchTarball
-      https://github.com/anmonteiro/nix-overlays/archive/57dc0624.tar.gz;
-
+      https://github.com/anmonteiro/nix-overlays/archive/af932978.tar.gz;
+  nixpkgs = import "${overlays}/sources.nix";
 in
-
-import "${overlays}/sources.nix" {
+import nixpkgs {
   overlays = [
     (import overlays)
     (self: super: {
-      ocamlPackages = super.ocaml-ng."ocamlPackages_${ocamlVersion}".overrideScope'
-        (super.callPackage "${overlays}/ocaml" { });
+      ocamlPackages = super.ocaml-ng."ocamlPackages_${ocamlVersion}";
     })
   ];
 }

@@ -7,7 +7,12 @@ let
 in
 (pkgs.mkShell {
   inputsFrom = lib.attrValues websocketafDrvs;
-  buildInputs = with pkgs.ocamlPackages; [ merlin pkgs.ocamlformat ];
+  buildInputs = with pkgs.ocamlPackages; [
+    merlin
+    pkgs.ocamlformat
+    httpaf-lwt-unix
+    httpaf-async
+  ];
 }).overrideAttrs (o: {
   propagatedBuildInputs = lib.filter
     (drv:
