@@ -19,6 +19,7 @@ let create
       (Handshake.create_request ~nonce ~headers target)
       ~error_handler
       ~response_handler
+      ~flush_headers_immediately:true
   in
   { connection
   ; body

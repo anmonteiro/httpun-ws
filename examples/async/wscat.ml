@@ -7,7 +7,11 @@ let websocket_handler wsd =
     | `Ok line ->
       let payload = Bytes.of_string line in
       Websocketaf.Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
-      input_loop wsd ()
+      if String.(line = "exit") then begin
+        Websocketaf.Wsd.close wsd;
+        Deferred.return ()
+      end else
+        input_loop wsd ()
     | `Eof -> assert false
   in
   Deferred.don't_wait_for (input_loop wsd ());
