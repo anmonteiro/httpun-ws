@@ -59,4 +59,4 @@ let () =
         ~doc:"int destination port"
       +> anon ("Destination Host" %: string)
     ) main
-  |> Command.run
+  |> Command_unix.run

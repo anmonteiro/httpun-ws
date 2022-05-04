@@ -1,11 +1,10 @@
+{ packages, pkgs, stdenv, lib, mkShell }:
+
 let
-  pkgs = import ./nix/sources.nix { };
-  inherit (pkgs) stdenv lib;
-  websocketafPkgs = pkgs.recurseIntoAttrs (import ./nix { inherit pkgs; });
-  websocketafDrvs = lib.filterAttrs (_: value: lib.isDerivation value) websocketafPkgs;
+  websocketafDrvs = lib.filterAttrs (_: value: lib.isDerivation value) packages;
 
 in
-(pkgs.mkShell {
+(mkShell {
   inputsFrom = lib.attrValues websocketafDrvs;
   buildInputs = with pkgs.ocamlPackages; [
     merlin
@@ -21,4 +20,3 @@ in
       !(lib.any (name: name == drv.pname) (lib.attrNames websocketafDrvs)))
     o.propagatedBuildInputs;
 })
-

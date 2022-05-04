@@ -1,11 +1,4 @@
-{ pkgs ? import ./sources.nix { inherit ocamlVersion; }
-, ocamlVersion ? "4_12"
-, doCheck ? true
-}:
-
-let
-  inherit (pkgs) lib stdenv ocamlPackages;
-in
+{ lib, stdenv, ocamlPackages, doCheck ? true }:
 
 with ocamlPackages;
 
@@ -19,52 +12,52 @@ let
     version = "0.0.1-dev";
     useDune2 = true;
   } // args);
-  websocketafPackages = rec {
-    websocketaf = buildWebsocketaf {
-      pname = "websocketaf";
-      src = genSrc {
-        dirs = [ "lib" "lib_test" ];
-        files = [ "websocketaf.opam" ];
-      };
-      buildInputs = [ alcotest ];
-      propagatedBuildInputs = [
-        angstrom
-        faraday
-        gluten
-        httpaf
-        base64
-      ];
-    };
+in
 
-    # These two don't have tests
-    websocketaf-lwt = buildWebsocketaf {
-      pname = "websocketaf-lwt";
-      src = genSrc {
-        dirs = [ "lwt" ];
-        files = [ "websocketaf-lwt.opam" ];
-      };
-      doCheck = false;
-      propagatedBuildInputs = [ gluten-lwt websocketaf lwt digestif ];
+rec {
+  websocketaf = buildWebsocketaf {
+    pname = "websocketaf";
+    src = genSrc {
+      dirs = [ "lib" "lib_test" ];
+      files = [ "websocketaf.opam" ];
     };
-
-    websocketaf-lwt-unix = buildWebsocketaf {
-      pname = "websocketaf-lwt-unix";
-      src = genSrc {
-        dirs = [ "lwt-unix" ];
-        files = [ "websocketaf-lwt-unix.opam" ];
-      };
-      doCheck = false;
-      propagatedBuildInputs = [
-        websocketaf
-        websocketaf-lwt
-        faraday-lwt-unix
-        gluten-lwt-unix
-      ];
-    };
+    buildInputs = [ alcotest ];
+    doCheck = true;
+    propagatedBuildInputs = [
+      angstrom
+      faraday
+      gluten
+      httpaf
+      base64
+    ];
   };
 
-in
-websocketafPackages // (if (lib.versionOlder "4.08" ocaml.version) then {
+  # These two don't have tests
+  websocketaf-lwt = buildWebsocketaf {
+    pname = "websocketaf-lwt";
+    src = genSrc {
+      dirs = [ "lwt" ];
+      files = [ "websocketaf-lwt.opam" ];
+    };
+    doCheck = false;
+    propagatedBuildInputs = [ gluten-lwt websocketaf lwt digestif ];
+  };
+
+  websocketaf-lwt-unix = buildWebsocketaf {
+    pname = "websocketaf-lwt-unix";
+    src = genSrc {
+      dirs = [ "lwt-unix" ];
+      files = [ "websocketaf-lwt-unix.opam" ];
+    };
+    doCheck = false;
+    propagatedBuildInputs = [
+      websocketaf
+      websocketaf-lwt
+      faraday-lwt-unix
+      gluten-lwt-unix
+    ];
+  };
+
   websocketaf-async = buildWebsocketaf {
     pname = "websocketaf-async";
     src = genSrc {
@@ -72,7 +65,7 @@ websocketafPackages // (if (lib.versionOlder "4.08" ocaml.version) then {
       files = [ "websocketaf-async.opam" ];
     };
     doCheck = false;
-    propagatedBuildInputs = with websocketafPackages; [
+    propagatedBuildInputs = [
       websocketaf
       async
       digestif
@@ -88,10 +81,10 @@ websocketafPackages // (if (lib.versionOlder "4.08" ocaml.version) then {
       files = [ "websocketaf-mirage.opam" ];
     };
     doCheck = false;
-    propagatedBuildInputs = with websocketafPackages; [
+    propagatedBuildInputs = [
       conduit-mirage
       websocketaf-lwt
       gluten-mirage
     ];
   };
-} else { })
+}

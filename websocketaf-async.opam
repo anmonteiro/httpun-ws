@@ -15,7 +15,8 @@ depends: [
   "websocketaf"
   "dune"
   "faraday-async"
-  "async"
+  "async" {>= "v0.15.0"}
+  "gluten-async"
   "digestif"
   "base64"
 ]
