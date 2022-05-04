@@ -10,8 +10,6 @@ in
   buildInputs = with pkgs.ocamlPackages; [
     merlin
     pkgs.ocamlformat
-    httpaf-lwt-unix
-    httpaf-async
   ];
 }).overrideAttrs (o: {
   propagatedBuildInputs = lib.filter
