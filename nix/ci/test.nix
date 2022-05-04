@@ -1,10 +1,24 @@
 { ocamlVersion }:
 
 let
-  pkgs = import ../sources.nix { inherit ocamlVersion; };
+  lock = builtins.fromJSON (builtins.readFile ./../../flake.lock);
+  src = fetchGit {
+    url = with lock.nodes.nixpkgs.locked;"https://github.com/${owner}/${repo}";
+    inherit (lock.nodes.nixpkgs.locked) rev;
+  };
+  pkgs = import "${src}/boot.nix" {
+    extraOverlays = [
+      (self: super: {
+        ocamlPackages = super.ocaml-ng."ocamlPackages_${ocamlVersion}";
+      })
+    ];
+  };
+
   inherit (pkgs) lib stdenv fetchTarball ocamlPackages;
 
-  websocketafPkgs = pkgs.recurseIntoAttrs (import ./.. { inherit ocamlVersion; doCheck = true; });
+  websocketafPkgs = pkgs.recurseIntoAttrs (pkgs.callPackage ./.. {
+    doCheck = true;
+  });
   websocketafDrvs = lib.filterAttrs (_: value: lib.isDerivation value) websocketafPkgs;
 
 in
