@@ -5,8 +5,18 @@ let
   src = fetchGit {
     url = with lock.nodes.nixpkgs.locked;"https://github.com/${owner}/${repo}";
     inherit (lock.nodes.nixpkgs.locked) rev;
+    allRefs = true;
   };
-  pkgs = import "${src}/boot.nix" {
+  nix-filter-src = fetchGit {
+    url = with lock.nodes.nix-filter.locked; "https://github.com/${owner}/${repo}";
+    inherit (lock.nodes.nix-filter.locked) rev;
+    # inherit (lock.nodes.nixpkgs.original) ref;
+    allRefs = true;
+  };
+
+  nix-filter = import "${nix-filter-src}";
+
+  pkgs = import "${src}" {
     extraOverlays = [
       (self: super: {
         ocamlPackages = super.ocaml-ng."ocamlPackages_${ocamlVersion}";
@@ -16,9 +26,10 @@ let
 
   inherit (pkgs) lib stdenv fetchTarball ocamlPackages;
 
-  websocketafPkgs = pkgs.recurseIntoAttrs (pkgs.callPackage ./.. {
+  websocketafPkgs = pkgs.callPackage ./.. {
+    inherit nix-filter;
     doCheck = true;
-  });
+  };
   websocketafDrvs = lib.filterAttrs (_: value: lib.isDerivation value) websocketafPkgs;
 
 in
