@@ -46,7 +46,7 @@ module Server (Flow : Mirage_flow.S) = struct
        ~websocket_handler
        ~error_handler
        ()
-       flow
+       (Gluten_mirage.Buffered_flow.create flow)
 end
 
 (* Almost like the `Websocketaf_lwt.Server` module type but we don't need the
@@ -65,5 +65,16 @@ end
 
 module type Client = Websocketaf_lwt.Client
 
-module Client (Flow : Mirage_flow.S) =
-  Websocketaf_lwt.Client (Gluten_mirage.Client (Flow))
+module Client (Flow : Mirage_flow.S) = struct
+    include Websocketaf_lwt.Client (Gluten_mirage.Client (Flow))
+    type socket = Flow.flow
+
+
+  let connect
+        ?config ~nonce ~host ~port ~resource ~error_handler
+        ~websocket_handler flow =
+    connect
+      ?config ~nonce ~host ~port ~resource
+      ~error_handler ~websocket_handler
+      (Gluten_mirage.Buffered_flow.create flow)
+  end

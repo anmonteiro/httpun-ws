@@ -1,13 +1,13 @@
-{ lib, stdenv, ocamlPackages, doCheck ? true }:
+{ nix-filter, lib, stdenv, ocamlPackages, doCheck ? true }:
 
 with ocamlPackages;
 
 let
-  genSrc = { dirs, files }: lib.filterGitSource {
-    src = ./..;
-    inherit dirs;
-    files = files ++ [ "dune-project" ];
-  };
+  genSrc = { dirs, files }:
+    with nix-filter; filter {
+      root = ./..;
+      include = [ "dune-project" ] ++ files ++ (builtins.map inDirectory dirs);
+    };
   buildWebsocketaf = args: buildDunePackage ({
     version = "0.0.1-dev";
     useDune2 = true;
