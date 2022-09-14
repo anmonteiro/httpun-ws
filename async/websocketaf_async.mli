@@ -7,9 +7,10 @@ module Server : sig
                            -> Websocketaf.Wsd.t
                            -> Websocketaf.Server_connection.input_handlers)
     -> error_handler     : ('a -> Websocketaf.Server_connection.error_handler)
-    -> (Socket.Address.Inet.t as 'a)
-    -> ([`Active], 'a) Socket.t
+    -> 'a
+    -> ([`Active], [< Socket.Address.t] as 'a) Socket.t
     -> unit Deferred.t
+
 end
 
 module Client : sig
@@ -21,6 +22,6 @@ module Client : sig
     -> resource          : string
     -> error_handler : (Websocketaf.Client_connection.error -> unit)
     -> websocket_handler : (Websocketaf.Wsd.t -> Websocketaf.Client_connection.input_handlers)
-    -> ([`Active], Socket.Address.Inet.t) Socket.t
+    -> ([`Active], [< Socket.Address.t]) Socket.t
     -> unit Deferred.t
 end

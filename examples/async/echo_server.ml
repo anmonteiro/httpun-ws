@@ -8,7 +8,7 @@ let connection_handler : ([< Socket.Address.t] as 'a) -> ([`Active], 'a) Socket.
   let module Response = Httpaf.Response in
   let module Status = Httpaf.Status in
 
-  let websocket_handler _ wsd =
+  let websocket_handler (_: [< Socket.Address.t]) wsd =
     let frame ~opcode ~is_fin:_ ~len:_ payload =
       match opcode with
       | `Continuation
