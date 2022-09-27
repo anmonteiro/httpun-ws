@@ -51,6 +51,7 @@ stdenv.mkDerivation {
     ]);
   doCheck = true;
   checkPhase = ''
+    ${ if !(lib.hasPrefix "5_" ocamlVersion) then "rm -rf ./examples/eio" else "" }
     dune build @examples/all --display=progress
   '';
 }
