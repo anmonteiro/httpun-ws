@@ -1,0 +1,4 @@
+(library
+ (name websocketaf_eio)
+ (public_name websocketaf-eio)
+ (libraries websocketaf gluten-eio eio digestif.ocaml base64))

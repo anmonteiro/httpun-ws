@@ -31,6 +31,7 @@ let
     doCheck = true;
   };
   websocketafDrvs = lib.filterAttrs (_: value: lib.isDerivation value) websocketafPkgs;
+  isOCaml5 = lib.hasPrefix "5_" ocamlVersion;
 
 in
 
@@ -48,9 +49,10 @@ stdenv.mkDerivation {
       findlib
       httpaf-lwt-unix
       httpaf-async
-    ]);
+    ] ++ lib.optional isOCaml5 httpaf-eio);
   doCheck = true;
   checkPhase = ''
+    ${ if !isOCaml5 then "rm -rf ./examples/eio" else "" }
     dune build @examples/all --display=progress
   '';
 }
