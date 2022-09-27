@@ -10,11 +10,11 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages."${system}".extend (self: super: {
-          ocamlPackages = super.ocaml-ng.ocamlPackages_4_14;
+          ocamlPackages = super.ocaml-ng.ocamlPackages_5_00;
         });
       in
       rec {
-        packages = (pkgs.callPackage ./nix { nix-filter = nix-filter.lib; });
+        packages = pkgs.callPackage ./nix { nix-filter = nix-filter.lib; };
         defaultPackage = packages.websocketaf;
         devShell = pkgs.callPackage ./shell.nix { inherit packages; };
       });
