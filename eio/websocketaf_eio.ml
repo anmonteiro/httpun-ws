@@ -3,11 +3,7 @@ let sha1 s =
   |> Digestif.SHA1.digest_string
   |> Digestif.SHA1.to_raw_string
 
-include Websocketaf_eio_intf
-
 module Server = struct
-  type socket = Eio.Net.stream_socket
-
   (* TODO: should this error handler be a websocket error handler or an HTTP
    * error handler?*)
   let create_connection_handler
