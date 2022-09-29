@@ -26,7 +26,7 @@ let websocket_handler wsd =
   let eof () =
     Log.Global.error "[EOF]\n%!"
   in
-  { Websocketaf.Client_connection.frame
+  { Websocketaf.Websocket_connection.frame
   ; eof
   }
 

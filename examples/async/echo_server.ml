@@ -30,7 +30,7 @@ let connection_handler : ([< Socket.Address.t] as 'a) -> ([`Active], 'a) Socket.
       Log.Global.error "EOF\n%!";
       Websocketaf.Wsd.close wsd
     in
-    { Websocketaf.Server_connection.frame
+    { Websocketaf.Websocket_connection.frame
     ; eof
     }
   in

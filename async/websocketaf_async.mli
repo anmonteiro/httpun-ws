@@ -5,7 +5,7 @@ module Server : sig
     :  ?config : Httpaf.Config.t
     -> websocket_handler : ( 'a
                            -> Websocketaf.Wsd.t
-                           -> Websocketaf.Server_connection.input_handlers)
+                           -> Websocketaf.Websocket_connection.input_handlers)
     -> error_handler     : ('a -> Websocketaf.Server_connection.error_handler)
     -> 'a
     -> ([`Active], [< Socket.Address.t] as 'a) Socket.t
@@ -21,7 +21,7 @@ module Client : sig
     -> port              : int
     -> resource          : string
     -> error_handler : (Websocketaf.Client_connection.error -> unit)
-    -> websocket_handler : (Websocketaf.Wsd.t -> Websocketaf.Client_connection.input_handlers)
+    -> websocket_handler : (Websocketaf.Wsd.t -> Websocketaf.Websocket_connection.input_handlers)
     -> ([`Active], [< Socket.Address.t]) Socket.t
     -> unit Deferred.t
 end

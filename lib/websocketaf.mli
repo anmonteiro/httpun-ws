@@ -175,6 +175,12 @@ module Handshake : sig
   -> (unit, string) result
 end
 
+module Websocket_connection : sig
+  type input_handlers =
+    { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> len:int -> Payload.t -> unit
+    ; eof   : unit -> unit }
+end
+
 module Client_connection : sig
   type t
 
@@ -182,22 +188,18 @@ module Client_connection : sig
     [ Httpaf.Client_connection.error
     | `Handshake_failure of Httpaf.Response.t * Httpaf.Body.Reader.t ]
 
-  type input_handlers =
-    { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> len:int -> Payload.t -> unit
-    ; eof   : unit -> unit }
-
   val connect
     :  nonce             : string
     -> ?headers          : Httpaf.Headers.t
     -> sha1              : (string -> string)
     -> error_handler     : (error -> unit)
-    -> websocket_handler : (Wsd.t -> input_handlers)
+    -> websocket_handler : (Wsd.t -> Websocket_connection.input_handlers)
     -> string
     -> t
 
   val create
     :  ?error_handler:(Wsd.t -> [`Exn of exn] -> unit)
-    -> (Wsd.t -> input_handlers) -> t
+    -> (Wsd.t -> Websocket_connection.input_handlers) -> t
 
   val next_read_operation  : t -> [ `Read | `Yield | `Close ]
   val next_write_operation
@@ -223,10 +225,6 @@ end
 module Server_connection : sig
   type t
 
-  type input_handlers =
-    { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> len:int -> Payload.t -> unit
-    ; eof   : unit -> unit }
-
   type error = [ `Exn of exn ]
 
   type error_handler = Wsd.t -> error -> unit
@@ -235,12 +233,12 @@ module Server_connection : sig
   val create
     : sha1 : (string -> string)
     -> ?error_handler : error_handler
-    -> (Wsd.t -> input_handlers)
+    -> (Wsd.t -> Websocket_connection.input_handlers)
     -> t
 
   val create_websocket
   : ?error_handler:error_handler
-  -> (Wsd.t -> input_handlers)
+  -> (Wsd.t -> Websocket_connection.input_handlers)
   -> t
 
   val next_read_operation  : t -> [ `Read | `Yield | `Close ]

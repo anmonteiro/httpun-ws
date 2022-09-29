@@ -39,7 +39,7 @@ module type Server = sig
 
   val create_connection_handler
     :  ?config : Httpaf.Config.t
-    -> websocket_handler : (Wsd.t -> Server_connection.input_handlers)
+    -> websocket_handler : (Wsd.t -> Websocket_connection.input_handlers)
     -> error_handler : Server_connection.error_handler
     -> socket
     -> unit Lwt.t

@@ -6,3 +6,4 @@ module Payload = Payload
 module Server_connection = Server_connection
 module Wsd = Wsd
 module Websocket = Websocket
+module Websocket_connection = Websocket_connection

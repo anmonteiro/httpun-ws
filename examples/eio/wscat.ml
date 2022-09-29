@@ -27,7 +27,7 @@ let websocket_handler env ~sw u wsd =
     Printf.eprintf "[EOF]\n%!";
     Promise.resolve u ()
   in
-  { Websocketaf.Client_connection.frame
+  { Websocketaf.Websocket_connection.frame
   ; eof
   }
 
