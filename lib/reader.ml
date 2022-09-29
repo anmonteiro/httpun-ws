@@ -49,17 +49,6 @@ and start t state =
     | AU.Partial { committed = 0; continue } ->
       t.parse_state <- Partial continue
     | _ -> assert false
-;;
-
-let next t =
-  match t.parse_state with
-  | Done ->
-    if t.closed
-    then `Close
-    else `Read
-  | Fail failure -> `Error failure
-  | Partial _ -> `Read
-;;
 
 let rec read_with_more t bs ~off ~len more =
   let consumed =
@@ -76,4 +65,12 @@ let rec read_with_more t bs ~off ~len more =
   | Incomplete -> ()
   end;
   consumed
-;;
+
+let next t =
+  match t.parse_state with
+  | Done ->
+    if t.closed
+    then `Close
+    else `Read
+  | Fail failure -> `Error failure
+  | Partial _ -> `Read
