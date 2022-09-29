@@ -90,13 +90,13 @@ module IOVec = Httpaf.IOVec
   let schedule_read t ~on_eof ~on_read =
     if t.read_scheduled
     then failwith "Payload.schedule_read: reader already scheduled";
-    if is_closed t
-    then do_execute_read t on_eof on_read
-    else begin
+    if not (is_closed t)
+    then begin
       t.read_scheduled <- true;
       t.on_eof         <- on_eof;
       t.on_read        <- on_read;
-    end
+    end;
+    do_execute_read t on_eof on_read
 
   let is_read_scheduled t = t.read_scheduled
 

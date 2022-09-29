@@ -128,10 +128,6 @@ module Wsd : sig
 
   type t
 
-  val create
-    : mode
-    -> t
-
   val schedule
     :  t
     -> kind:[ `Text | `Binary | `Continuation ]
@@ -155,6 +151,7 @@ module Wsd : sig
   val close   : ?code:Websocket.Close_code.t -> t -> unit
 
   val is_closed : t -> bool
+  val error_code : t -> [> `Exn of exn] option
 end
 
 module Handshake : sig

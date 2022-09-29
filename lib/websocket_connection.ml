@@ -8,7 +8,6 @@ type t =
   { reader : [`Parse of string list * string] Reader.t
   ; wsd    : Wsd.t
   ; eof : unit -> unit
-  ; error_handler: error_handler
   }
 
 type input_handlers =
@@ -35,22 +34,19 @@ let default_error_handler wsd (`Exn exn) =
 ;;
 
 let create ~mode ?(error_handler = default_error_handler) websocket_handler =
-  let wsd = Wsd.create mode in
+  let wsd = Wsd.create ~error_handler mode in
   let { frame; eof } = websocket_handler wsd in
   { reader = Reader.create frame
   ; wsd
   ; eof
-  ; error_handler
   }
 
 let shutdown { wsd; _ } =
   Wsd.close wsd
 
 let set_error_and_handle t error =
-  if not (Wsd.is_closed t.wsd) then begin
-    t.error_handler t.wsd error;
-    shutdown t
-  end
+  Wsd.report_error t.wsd error;
+  shutdown t
 
 let next_read_operation t =
   match Reader.next t.reader with
