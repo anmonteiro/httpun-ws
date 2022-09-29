@@ -5,17 +5,12 @@ type state =
   | Handshake of Server_handshake.t
   | Websocket of Websocket_connection.t
 
-type input_handlers = Websocket_connection.input_handlers =
-  { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> len:int -> Payload.t -> unit
-  ; eof   : unit -> unit }
-
 type error = Websocket_connection.error
 type error_handler = Websocket_connection.error_handler
 
-
 type t =
   { mutable state: state
-  ; websocket_handler: Wsd.t -> input_handlers
+  ; websocket_handler: Wsd.t -> Websocket_connection.input_handlers
   }
 
 let is_closed t =

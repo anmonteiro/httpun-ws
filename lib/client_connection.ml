@@ -10,10 +10,6 @@ type error =
   [ Httpaf.Client_connection.error
   | `Handshake_failure of Httpaf.Response.t * Httpaf.Body.Reader.t ]
 
-type input_handlers = Websocket_connection.input_handlers =
-  { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> len:int -> Payload.t -> unit
-  ; eof   : unit -> unit }
-
 let passes_scrutiny ~status ~accept headers =
  (*
   * The client MUST validate the server's response as follows:

@@ -95,7 +95,7 @@ module Websocket = struct
        Format.eprintf "EOF\n%!";
        Wsd.close wsd
      in
-     { Server_connection.frame
+     { Websocket_connection.frame
      ; eof
      }
    in

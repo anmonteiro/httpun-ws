@@ -28,7 +28,7 @@ let websocket_handler u wsd =
     Printf.eprintf "[EOF]\n%!";
     Lwt.wakeup_later u ()
   in
-  { Websocketaf.Client_connection.frame
+  { Websocketaf.Websocket_connection.frame
   ; eof
   }
 

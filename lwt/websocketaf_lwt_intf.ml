@@ -41,7 +41,7 @@ module type Server = sig
 
   val create_connection_handler
     :  ?config : Httpaf.Config.t
-    -> websocket_handler : (addr -> Wsd.t -> Server_connection.input_handlers)
+    -> websocket_handler : (addr -> Wsd.t -> Websocket_connection.input_handlers)
     -> error_handler : (addr -> Websocketaf.Server_connection.error_handler)
     -> (addr -> socket -> unit Lwt.t)
 end
@@ -59,7 +59,7 @@ module type Client = sig
     -> port              : int
     -> resource          : string
     -> error_handler : (Client_connection.error -> unit)
-    -> websocket_handler : (Wsd.t -> Client_connection.input_handlers)
+    -> websocket_handler : (Wsd.t -> Websocket_connection.input_handlers)
     -> socket
     -> t Lwt.t
 

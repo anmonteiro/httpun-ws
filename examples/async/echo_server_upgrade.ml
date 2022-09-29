@@ -33,7 +33,7 @@ let connection_handler =
       Format.eprintf "EOF\n%!";
       Websocketaf.Wsd.close wsd
     in
-    { Websocketaf.Server_connection.frame
+    { Websocketaf.Websocket_connection.frame
     ; eof
     }
   in
