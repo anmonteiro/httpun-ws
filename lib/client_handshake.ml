@@ -12,7 +12,7 @@ let create
     ~response_handler
     target
   =
-  let connection = Httpaf.Client_connection.create ?config:None in
+  let connection = Httpaf.Client_connection.create () in
   let body =
     Httpaf.Client_connection.request
       connection
