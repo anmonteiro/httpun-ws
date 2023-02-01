@@ -99,13 +99,10 @@ let payload_parser t =
     commit
   in
   let schedule_size ~src_off payload n =
-    Format.eprintf "sched %d; src_off: %d@." n src_off;
     let open Angstrom in
     begin if Payload.is_closed payload
     then advance n
     else take_bigstring n >>| fun bs ->
-      let `Hex x = Hex.of_string (Bigstringaf.to_string bs) in
-      Format.eprintf "x: %s" x;
       let faraday = Payload.unsafe_faraday payload in
       Faraday.schedule_bigstring faraday (unmask ~src_off t bs)
     end *> commit
@@ -122,7 +119,6 @@ let payload_parser t =
             available >>= fun m ->
             let m' = (min m n) in
             let n' = n - m' in
-            Format.eprintf "do it %d %d@." m' n';
             schedule_size ~src_off t.payload m' >>= fun () -> read_exact (src_off + m') n'
     in
     fun n -> read_exact 0 n
