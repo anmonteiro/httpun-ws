@@ -1,4 +1,5 @@
 module IOVec = Httpaf.IOVec
+module Reader = Parse.Reader
 
 type error = [ `Exn of exn ]
 
