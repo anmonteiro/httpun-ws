@@ -98,7 +98,7 @@ websocketafPackages // (if lib.versionOlder "5.0" ocaml.version then {
 
     propagatedBuildInputs = [
       gluten-eio
-      websocketaf
+      websocketafPackages.websocketaf
       digestif
     ];
   };
