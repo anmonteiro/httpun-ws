@@ -127,7 +127,7 @@ let payload_parser t =
   >>= fun () -> finish t.payload
 ;;
 
-let parse ~buf =
+let frame ~buf =
   let open Angstrom in
   parse_headers
   >>| fun headers ->
@@ -157,7 +157,7 @@ module Reader = struct
       let open Angstrom in
       let buf = Bigstringaf.create 0x1000 in
       skip_many
-        (parse ~buf <* commit >>= fun frame ->
+        (frame ~buf <* commit >>= fun frame ->
           let payload = payload frame in
           let is_fin = is_fin frame in
           let opcode = opcode frame in
