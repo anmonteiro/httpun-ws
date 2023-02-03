@@ -75,48 +75,6 @@ module Websocket : sig
     val of_int     : int -> t option
     val of_int_exn : int -> t
   end
-
-  module Frame : sig
-    type t
-
-    val is_fin   : t -> bool
-    val rsv      : t -> int
-
-    val opcode   : t -> Opcode.t
-
-    val has_mask : t -> bool
-    val mask     : t -> int32 option
-    val mask_exn : t -> int32
-
-    val payload : t -> Payload.t
-    val payload_length : t -> int
-    val length : t -> int
-
-    val parse : buf:Bigstringaf.t -> t Angstrom.t
-    val payload_parser : t -> unit Angstrom.t
-
-    val serialize_control : ?mask:int32 -> Faraday.t -> opcode:Opcode.standard_control -> unit
-
-    val schedule_serialize
-      :  ?mask:int32
-      -> Faraday.t
-      -> is_fin:bool
-      -> opcode:Opcode.t
-      -> payload:Bigstringaf.t
-      -> off:int
-      -> len:int
-      -> unit
-
-    val serialize_bytes
-      :  ?mask:int32
-      -> Faraday.t
-      -> is_fin:bool
-      -> opcode:Opcode.t
-      -> payload:Bytes.t
-      -> off:int
-      -> len:int
-      -> unit
-  end
 end
 
 module Wsd : sig

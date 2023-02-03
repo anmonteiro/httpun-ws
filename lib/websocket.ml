@@ -144,206 +144,28 @@ module Close_code = struct
 end
 
 module Frame = struct
-  type t =
-  { headers: Bigstringaf.t
-  ; payload: Payload.t
-  }
-
-  let is_fin t =
-    let bits = Bigstringaf.unsafe_get t.headers 0 |> Char.code in
-    bits land (1 lsl 7) = 1 lsl 7
-  ;;
-
-  let rsv t =
-    let bits = Bigstringaf.unsafe_get t.headers 0 |> Char.code in
-    (bits lsr 4) land 0b0111
-  ;;
-
-  let opcode t =
-    let bits = Bigstringaf.unsafe_get t.headers 0 |> Char.code in
-    bits land 0b1111 |> Opcode.unsafe_of_code
-  ;;
-
-  let payload_length_of_headers headers =
-    let bits = Bigstringaf.unsafe_get headers 1 |> Char.code in
-    let length = bits land 0b01111111 in
-    if length = 126 then Bigstringaf.unsafe_get_int16_be headers 2                 else
-    (* This is technically unsafe, but if somebody's asking us to read 2^63
-     * bytes, then we're already screwed. *)
-    if length = 127 then Bigstringaf.unsafe_get_int64_be headers 2 |> Int64.to_int else
-    length
-  ;;
-
-  let payload_length t = payload_length_of_headers t.headers
-
-  let has_mask t =
-    let bits = Bigstringaf.unsafe_get t.headers 1 |> Char.code in
-    bits land (1 lsl 7) = 1 lsl 7
-  ;;
-
-  let mask t =
-    if not (has_mask t)
-    then None
-    else
-      Some (
-        let bits = Bigstringaf.unsafe_get t.headers 1 |> Char.code in
-        if bits  = 254 then Bigstringaf.unsafe_get_int32_be t.headers 4  else
-        if bits  = 255 then Bigstringaf.unsafe_get_int32_be t.headers 10 else
-        Bigstringaf.unsafe_get_int32_be t.headers 2)
-  ;;
-
-  let mask_exn t =
-    let bits = Bigstringaf.unsafe_get t.headers 1 |> Char.code in
-    if bits  = 254 then Bigstringaf.unsafe_get_int32_be t.headers 4  else
-    if bits  = 255 then Bigstringaf.unsafe_get_int32_be t.headers 10 else
-    if bits >= 127 then Bigstringaf.unsafe_get_int32_be t.headers 2  else
-    failwith "Frame.mask_exn: no mask present"
-  ;;
-
-  let payload t = t.payload
-
-  let length t =
-    let payload_length = payload_length t in
-    Bigstringaf.length t.headers + payload_length
-  ;;
-
-  let apply_mask mask ?(off=0) ?len bs =
-    let len = match len with | None -> Bigstringaf.length bs | Some n -> n in
+  let apply_mask mask ?(off=0) ?(src_off=off) ?len bs =
+    let len =
+      match len with
+      | None -> Bigstringaf.length bs
+      | Some n -> n
+    in
     for i = off to off + len - 1 do
-      let j = (i - off) mod 4 in
+      let j = (i + src_off - off) mod 4 in
+      (* let j = (i - off) mod 4 in *)
       let c = Bigstringaf.unsafe_get bs i |> Char.code in
       let c = c lxor Int32.(logand (shift_right mask (8 * (3 - j))) 0xffl |> to_int) in
       Bigstringaf.unsafe_set bs i (Char.unsafe_chr c)
     done
   ;;
 
-  let apply_mask_bytes mask bs ~off ~len =
+  let apply_mask_bytes mask bs ~src_off ~off ~len =
     for i = off to off + len - 1 do
-      let j = (i - off) mod 4 in
+      (* let j = (i - off) mod 4 in *)
+      let j = (i + src_off - off) mod 4 in
       let c = Bytes.unsafe_get bs i |> Char.code in
       let c = c lxor Int32.(logand (shift_right mask (8 * (3 - j))) 0xffl |> to_int) in
       Bytes.unsafe_set bs i (Char.unsafe_chr c)
     done
-  ;;
-
-  let payload_offset_of_bits bits =
-    let initial_offset = 2 in
-    let mask_offset    = (bits land (1 lsl 7)) lsr (7 - 2) in
-    let length_offset  =
-      let length = bits land 0b01111111 in
-      if length < 126
-      then 0
-      else 2 lsl ((length land 0b1) lsl 2)
-    in
-    initial_offset + mask_offset + length_offset
-  ;;
-
-  let payload_offset ?(off=0) bs =
-    let bits = Bigstringaf.unsafe_get bs (off + 1) |> Char.code in
-    payload_offset_of_bits bits
-  ;;
-
-  let parse_headers =
-    let open Angstrom in
-    Unsafe.peek 2 (fun bs ~off ~len:_ -> payload_offset ~off bs)
-    >>= fun headers_len -> Unsafe.take headers_len Bigstringaf.sub
-  ;;
-
-  let payload_parser t =
-    let open Angstrom in
-    let unmask t bs =
-      match mask t with
-      | None -> bs
-      | Some mask ->
-        apply_mask mask bs;
-        bs
-    in
-    let finish payload =
-      let open Angstrom in
-      Payload.close payload;
-      commit
-    in
-    let schedule_size payload n =
-      let open Angstrom in
-      begin if Payload.is_closed payload
-      then advance n
-      else take_bigstring n >>| fun bs ->
-        let faraday = Payload.unsafe_faraday payload in
-        Faraday.schedule_bigstring faraday (unmask t bs)
-      end *> commit
-    in
-    let rec read_exact n =
-      if n = 0
-      then return ()
-      else
-        at_end_of_input
-        >>= function
-          | true -> commit *> fail "missing payload bytes"
-          | false ->
-            available >>= fun m ->
-            let m' = (min m n) in
-            let n' = n - m' in
-            schedule_size t.payload m' >>= fun () -> read_exact n'
-    in
-    read_exact (payload_length t)
-    >>= fun () -> finish t.payload
-  ;;
-
-  let parse ~buf =
-    let open Angstrom in
-    parse_headers
-    >>| fun headers ->
-      let len = payload_length_of_headers headers in
-      let payload = match len with
-      | 0 -> Payload.empty
-      | _ -> Payload.create buf
-      in
-      { headers; payload }
-  ;;
-
-  let serialize_headers ?mask faraday ~is_fin ~opcode ~payload_length =
-    let opcode = Opcode.to_int opcode in
-    let is_fin = if is_fin then 1 lsl 7 else 0 in
-    let is_mask =
-      match mask with
-      | None   -> 0
-      | Some _ -> 1 lsl 7
-    in
-    Faraday.write_uint8 faraday (is_fin lor opcode);
-    if      payload_length <= 125    then
-      Faraday.write_uint8 faraday (is_mask lor payload_length)
-    else if payload_length <= 0xffff then begin
-      Faraday.write_uint8     faraday (is_mask lor 126);
-      Faraday.BE.write_uint16 faraday payload_length;
-    end else begin
-      Faraday.write_uint8     faraday (is_mask lor 127);
-      Faraday.BE.write_uint64 faraday (Int64.of_int payload_length);
-    end;
-    begin match mask with
-    | None      -> ()
-    | Some mask -> Faraday.BE.write_uint32 faraday mask
-    end
-  ;;
-
-  let serialize_control ?mask faraday ~opcode =
-    let opcode = (opcode :> Opcode.t) in
-    serialize_headers faraday ?mask ~is_fin:true ~opcode ~payload_length:0
-
-  let schedule_serialize ?mask faraday ~is_fin ~opcode ~payload ~off ~len =
-    serialize_headers faraday ?mask ~is_fin ~opcode ~payload_length:len;
-    begin match mask with
-    | None -> ()
-    | Some mask -> apply_mask mask payload ~off ~len
-    end;
-    Faraday.schedule_bigstring faraday payload ~off ~len;
-  ;;
-
-  let serialize_bytes ?mask faraday ~is_fin ~opcode ~payload ~off ~len =
-    serialize_headers faraday ?mask ~is_fin ~opcode ~payload_length:len;
-    begin match mask with
-    | None -> ()
-    | Some mask -> apply_mask_bytes mask payload ~off ~len
-    end;
-    Faraday.write_bytes faraday payload ~off ~len;
   ;;
 end

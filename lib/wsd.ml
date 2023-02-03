@@ -9,6 +9,7 @@ type mode =
 
 type t =
   { faraday : Faraday.t
+  ; mutable bytes_sent : int
   ; mode : mode
   ; mutable wakeup : Optional_thunk.t
   ; error_handler: error_handler
@@ -20,6 +21,7 @@ let default_ready_to_write = Sys.opaque_identity (fun () -> ())
 
 let create ~error_handler mode =
   { faraday = Faraday.create 0x1000
+  ; bytes_sent = 0
   ; mode
   ; wakeup = Optional_thunk.none
   ; error_handler
@@ -48,20 +50,37 @@ let wakeup t =
 
 let schedule t ~kind payload ~off ~len =
   let mask = mask t in
-  Websocket.Frame.schedule_serialize t.faraday ?mask ~is_fin:true ~opcode:(kind :> Websocket.Opcode.t) ~payload ~off ~len;
+  Serialize.schedule_serialize
+    t.faraday
+    (* TODO: is_fin *)
+    ?mask
+    ~is_fin:true
+    ~opcode:(kind :> Websocket.Opcode.t)
+    ~src_off:t.bytes_sent
+    ~payload ~off ~len;
+  t.bytes_sent <- t.bytes_sent + len;
   wakeup t
 
 let send_bytes t ~kind payload ~off ~len =
   let mask = mask t in
-  Websocket.Frame.serialize_bytes t.faraday ?mask ~is_fin:true ~opcode:(kind :> Websocket.Opcode.t) ~payload ~off ~len;
+  Serialize.serialize_bytes
+    t.faraday
+    ?mask
+    ~is_fin:true
+    ~opcode:(kind :> Websocket.Opcode.t)
+    ~payload
+    ~src_off:t.bytes_sent
+    ~off
+    ~len;
+  t.bytes_sent <- t.bytes_sent + len;
   wakeup t
 
 let send_ping t =
-  Websocket.Frame.serialize_control t.faraday ~opcode:`Ping;
+  Serialize.serialize_control t.faraday ~opcode:`Ping;
   wakeup t
 
 let send_pong t =
-  Websocket.Frame.serialize_control t.faraday ~opcode:`Pong;
+  Serialize.serialize_control t.faraday ~opcode:`Pong;
   wakeup t
 
 let flushed t f = Faraday.flush t.faraday f
@@ -72,7 +91,13 @@ let close ?code t =
     let mask = mask t in
     let payload = Bytes.create 2 in
     Bytes.set_uint16_be payload 0 (Websocket.Close_code.to_int code);
-    Websocket.Frame.serialize_bytes t.faraday ?mask ~is_fin:true ~opcode:`Connection_close ~payload ~off:0 ~len:2;
+    Serialize.serialize_bytes t.faraday
+      ?mask
+      ~is_fin:true
+      ~opcode:`Connection_close
+      ~src_off:t.bytes_sent
+      ~payload ~off:0 ~len:2;
+      t.bytes_sent <- t.bytes_sent + 2;
   | None -> ()
   end;
   Faraday.close t.faraday;
