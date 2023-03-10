@@ -26,4 +26,6 @@ module Client : sig
     -> t
 
   val is_closed : t -> bool
+
+  val shutdown : t -> unit Eio.Promise.t
 end
