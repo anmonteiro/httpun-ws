@@ -52,4 +52,6 @@ module Client = struct
       socket
 
   let is_closed t = Client_runtime.is_closed t
+
+  let shutdown t = Client_runtime.shutdown t
 end
