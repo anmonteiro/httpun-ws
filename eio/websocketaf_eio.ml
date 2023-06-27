@@ -9,19 +9,21 @@ module Server = struct
   let create_connection_handler
     ?(config = Httpaf.Config.default)
     ~websocket_handler
-    ~error_handler = fun client_addr socket ->
-    let connection =
-      Websocketaf.Server_connection.create
-        ~sha1
-        ~error_handler:(error_handler client_addr)
-        (websocket_handler client_addr)
-    in
-    Gluten_eio.Server.create_connection_handler
-      ~read_buffer_size:config.read_buffer_size
-      ~protocol:(module Websocketaf.Server_connection)
-      connection
-      client_addr
-      socket
+    ~error_handler ~sw =
+    fun client_addr socket ->
+      let connection =
+        Websocketaf.Server_connection.create
+          ~sha1
+          ~error_handler:(error_handler client_addr)
+          (websocket_handler client_addr)
+      in
+      Gluten_eio.Server.create_connection_handler
+        ~read_buffer_size:config.read_buffer_size
+        ~protocol:(module Websocketaf.Server_connection)
+        ~sw
+        connection
+        client_addr
+        socket
 end
 
 module Client = struct
