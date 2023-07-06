@@ -1,4 +1,4 @@
 (library
  (name websocketaf)
  (public_name websocketaf)
- (libraries gluten base64 angstrom faraday httpaf result bigstringaf))
+ (libraries gluten base64 angstrom faraday httpaf bigstringaf))
