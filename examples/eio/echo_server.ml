@@ -1,4 +1,4 @@
-let connection_handler : Eio.Net.Sockaddr.stream -> Eio.Net.stream_socket -> unit =
+let connection_handler ~sw : Eio.Net.Sockaddr.stream -> Eio.Net.stream_socket -> unit =
   let module Body = Httpaf.Body in
   let module Headers = Httpaf.Headers in
   let module Reqd = Httpaf.Reqd in
@@ -42,6 +42,7 @@ let connection_handler : Eio.Net.Sockaddr.stream -> Eio.Net.stream_socket -> uni
     ?config:None
     ~websocket_handler
     ~error_handler
+    ~sw
 
 
 let () =
@@ -69,7 +70,7 @@ let () =
             while true do
               Eio.Net.accept_fork socket ~sw ~on_error:(fun _ -> assert false) (fun client_sock client_addr ->
                   (* let p, u = Eio.Promise.create () in *)
-                  connection_handler client_addr client_sock)
+                  connection_handler ~sw client_addr client_sock)
             done;
           `Stop_daemon)))
     done;
