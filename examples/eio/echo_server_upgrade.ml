@@ -103,7 +103,7 @@ let () =
             while true do
               Eio.Net.accept_fork socket ~sw ~on_error:(fun _ -> assert false) (fun client_sock client_addr ->
                   (* let p, u = Eio.Promise.create () in *)
-                  connection_handler client_addr client_sock)
+                  connection_handler ~sw client_addr client_sock)
             done;
           `Stop_daemon)))
     done;
