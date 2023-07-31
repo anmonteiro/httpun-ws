@@ -145,7 +145,7 @@ module Close_code = struct
 end
 
 module Frame = struct
-  let apply_mask mask ?(off=0) ?(src_off=off) ?len bs =
+  let apply_mask mask ?(off=0) ~src_off ?len bs =
     let len =
       match len with
       | None -> Bigstringaf.length bs
