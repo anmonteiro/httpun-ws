@@ -102,8 +102,8 @@ module Wsd : sig
     -> len:int
     -> unit
 
-  val send_ping : t -> unit
-  val send_pong : t -> unit
+  val send_ping : ?application_data:Bigstringaf.t IOVec.t -> t -> unit
+  val send_pong : ?application_data:Bigstringaf.t IOVec.t -> t -> unit
 
   val flushed : t -> (unit -> unit) -> unit
   val close   : ?code:Websocket.Close_code.t -> t -> unit

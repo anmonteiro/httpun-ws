@@ -39,6 +39,7 @@ module Opcode = struct
      ; `Other 0x7
      ; `Connection_close
      ; `Ping
+     ; `Pong
      ; `Other 0xb
      ; `Other 0xc
      ; `Other 0xd

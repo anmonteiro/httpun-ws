@@ -75,12 +75,40 @@ let send_bytes t ~kind payload ~off ~len =
   t.bytes_sent <- t.bytes_sent + len;
   wakeup t
 
-let send_ping t =
-  Serialize.serialize_control t.faraday ~opcode:`Ping;
+let send_ping ?application_data t =
+  begin match application_data with
+  | None -> Serialize.serialize_control t.faraday ~opcode:`Ping
+  | Some { IOVec.buffer; off; len } ->
+    let mask = mask t in
+    Serialize.schedule_serialize
+      t.faraday
+      ?mask
+      ~is_fin:true
+      ~opcode:`Ping
+      ~src_off:t.bytes_sent
+      ~payload:buffer
+      ~off
+      ~len;
+    t.bytes_sent <- t.bytes_sent + len;
+  end;
   wakeup t
 
-let send_pong t =
-  Serialize.serialize_control t.faraday ~opcode:`Pong;
+let send_pong ?application_data t =
+  begin match application_data with
+  | None -> Serialize.serialize_control t.faraday ~opcode:`Pong;
+  | Some { IOVec.buffer; off; len } ->
+    let mask = mask t in
+    Serialize.schedule_serialize
+      t.faraday
+      ?mask
+      ~is_fin:true
+      ~opcode:`Pong
+      ~src_off:t.bytes_sent
+      ~payload:buffer
+      ~off
+      ~len;
+    t.bytes_sent <- t.bytes_sent + len;
+  end;
   wakeup t
 
 let flushed t f = Faraday.flush t.faraday f
