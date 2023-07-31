@@ -31,11 +31,6 @@ let websocket_handler u wsd =
   ; eof
   }
 
-let error_handler = function
-  | `Handshake_failure (rsp, _body) ->
-    Format.eprintf "Handshake failure: %a\n%!" Httpaf.Response.pp_hum rsp
-  | _ -> assert false
-
 let () =
   let host = ref None in
   let port = ref 80 in
