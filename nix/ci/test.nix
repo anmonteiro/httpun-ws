@@ -5,13 +5,11 @@ let
   src = fetchGit {
     url = with lock.nodes.nixpkgs.locked;"https://github.com/${owner}/${repo}";
     inherit (lock.nodes.nixpkgs.locked) rev;
-    allRefs = true;
   };
   nix-filter-src = fetchGit {
     url = with lock.nodes.nix-filter.locked; "https://github.com/${owner}/${repo}";
     inherit (lock.nodes.nix-filter.locked) rev;
     # inherit (lock.nodes.nixpkgs.original) ref;
-    allRefs = true;
   };
 
   nix-filter = import "${nix-filter-src}";
