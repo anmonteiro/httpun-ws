@@ -50,7 +50,7 @@ module Websocket = struct
 
     let read_payload frame =
       let rev_payload_chunks = ref [] in
-      let payload = Parse.payload frame in
+      let payload =  frame.Parse.payload in
       Payload.schedule_read payload
         ~on_eof:ignore
         ~on_read:(fun bs ~off ~len ->
