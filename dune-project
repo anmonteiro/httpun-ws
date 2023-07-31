@@ -1,3 +1,3 @@
-(lang dune 1.1)
+(lang dune 3.0)
 
 (name websocketaf)
