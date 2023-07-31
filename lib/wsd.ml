@@ -9,7 +9,6 @@ type mode =
 
 type t =
   { faraday : Faraday.t
-  ; mutable bytes_sent : int
   ; mode : mode
   ; mutable wakeup : Optional_thunk.t
   ; error_handler: error_handler
@@ -21,7 +20,6 @@ let default_ready_to_write = Sys.opaque_identity (fun () -> ())
 
 let create ~error_handler mode =
   { faraday = Faraday.create 0x1000
-  ; bytes_sent = 0
   ; mode
   ; wakeup = Optional_thunk.none
   ; error_handler
@@ -56,9 +54,8 @@ let schedule t ~kind payload ~off ~len =
     ?mask
     ~is_fin:true
     ~opcode:(kind :> Websocket.Opcode.t)
-    ~src_off:t.bytes_sent
+    ~src_off:0
     ~payload ~off ~len;
-  t.bytes_sent <- t.bytes_sent + len;
   wakeup t
 
 let send_bytes t ~kind payload ~off ~len =
@@ -69,10 +66,9 @@ let send_bytes t ~kind payload ~off ~len =
     ~is_fin:true
     ~opcode:(kind :> Websocket.Opcode.t)
     ~payload
-    ~src_off:t.bytes_sent
+    ~src_off:0
     ~off
     ~len;
-  t.bytes_sent <- t.bytes_sent + len;
   wakeup t
 
 let send_ping ?application_data t =
@@ -85,11 +81,10 @@ let send_ping ?application_data t =
       ?mask
       ~is_fin:true
       ~opcode:`Ping
-      ~src_off:t.bytes_sent
+      ~src_off:0
       ~payload:buffer
       ~off
       ~len;
-    t.bytes_sent <- t.bytes_sent + len;
   end;
   wakeup t
 
@@ -103,11 +98,10 @@ let send_pong ?application_data t =
       ?mask
       ~is_fin:true
       ~opcode:`Pong
-      ~src_off:t.bytes_sent
+      ~src_off:0
       ~payload:buffer
       ~off
       ~len;
-    t.bytes_sent <- t.bytes_sent + len;
   end;
   wakeup t
 
@@ -123,9 +117,8 @@ let close ?code t =
       ?mask
       ~is_fin:true
       ~opcode:`Connection_close
-      ~src_off:t.bytes_sent
+      ~src_off:0
       ~payload ~off:0 ~len:2;
-      t.bytes_sent <- t.bytes_sent + 2;
   | None -> ()
   end;
   Faraday.close t.faraday;

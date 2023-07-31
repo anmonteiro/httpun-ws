@@ -54,8 +54,6 @@ let mask_exn t =
   failwith "Frame.mask_exn: no mask present"
 ;;
 
-let payload t = t.payload
-
 let length t =
   let payload_length = payload_length t in
   Bigstringaf.length t.headers + payload_length
@@ -158,7 +156,7 @@ module Reader = struct
       let buf = Bigstringaf.create 0x1000 in
       skip_many
         (frame ~buf <* commit >>= fun frame ->
-          let payload = payload frame in
+          let payload = frame.payload in
           let is_fin = is_fin frame in
           let opcode = opcode frame in
           let len = payload_length frame in
