@@ -74,6 +74,9 @@ module Websocket : sig
 
     val of_int     : int -> t option
     val of_int_exn : int -> t
+
+    val of_bigstring : Bigstringaf.t -> off:int -> t option
+    val of_bigstring_exn : Bigstringaf.t -> off:int -> t
   end
 end
 
