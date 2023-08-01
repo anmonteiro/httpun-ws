@@ -145,13 +145,19 @@ module Close_code = struct
 
   let of_bigstring bs ~off =
     (* Close code takes 2 bytes *)
-    let code_int = Bigstringaf.get_int16_be bs off in
-    of_int code_int
+    if Bigstringaf.length bs - off - 2  < 0
+    then None
+    else
+      let code_int = Bigstringaf.get_int16_be bs off in
+      of_int code_int
 
   let of_bigstring_exn bs ~off =
     (* Close code takes 2 bytes *)
-    let code_int = Bigstringaf.get_int16_be bs off in
-    of_int_exn code_int
+    if Bigstringaf.length bs - off - 2  < 0
+    then failwith "Close_code.of_bigstring_exn: can't read 2 bytes from bigstring"
+    else
+      let code_int = Bigstringaf.get_int16_be bs off in
+      of_int_exn code_int
 end
 
 module Frame = struct
