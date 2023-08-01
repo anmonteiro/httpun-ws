@@ -88,19 +88,25 @@ module Wsd : sig
 
   val schedule
     :  t
+    -> ?is_fin:bool
     -> kind:[ `Text | `Binary | `Continuation ]
     -> Bigstringaf.t
     -> off:int
     -> len:int
     -> unit
+  (** [is_fin] defaults to [true]. Set to `false` if sending multiple frames,
+      except on the last one. *)
 
   val send_bytes
     :  t
+    -> ?is_fin:bool
     -> kind:[ `Text | `Binary | `Continuation ]
     -> Bytes.t
     -> off:int
     -> len:int
     -> unit
+  (** [is_fin] defaults to [true]. Set to `false` if sending multiple frames,
+      except on the last one. *)
 
   val send_ping : ?application_data:Bigstringaf.t IOVec.t -> t -> unit
   val send_pong : ?application_data:Bigstringaf.t IOVec.t -> t -> unit
