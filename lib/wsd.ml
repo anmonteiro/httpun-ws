@@ -46,24 +46,24 @@ let wakeup t =
   t.wakeup <- Optional_thunk.none;
   Optional_thunk.call_if_some f
 
-let schedule t ~kind payload ~off ~len =
+let schedule t ?(is_fin=true) ~kind payload ~off ~len =
   let mask = mask t in
   Serialize.schedule_serialize
     t.faraday
     (* TODO: is_fin *)
     ?mask
-    ~is_fin:true
+    ~is_fin
     ~opcode:(kind :> Websocket.Opcode.t)
     ~src_off:0
     ~payload ~off ~len;
   wakeup t
 
-let send_bytes t ~kind payload ~off ~len =
+let send_bytes t ?(is_fin=true) ~kind payload ~off ~len =
   let mask = mask t in
   Serialize.serialize_bytes
     t.faraday
     ?mask
-    ~is_fin:true
+    ~is_fin
     ~opcode:(kind :> Websocket.Opcode.t)
     ~payload
     ~src_off:0
