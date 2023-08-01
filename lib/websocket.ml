@@ -142,6 +142,16 @@ module Close_code = struct
   let to_int = code
   let of_int = of_code
   let of_int_exn = of_code_exn
+
+  let of_bigstring bs ~off =
+    (* Close code takes 2 bytes *)
+    let code_int = Bigstringaf.get_int16_be bs off in
+    of_int code_int
+
+  let of_bigstring_exn bs ~off =
+    (* Close code takes 2 bytes *)
+    let code_int = Bigstringaf.get_int16_be bs off in
+    of_int_exn code_int
 end
 
 module Frame = struct
