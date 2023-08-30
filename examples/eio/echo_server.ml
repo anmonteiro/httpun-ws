@@ -1,4 +1,4 @@
-let connection_handler ~sw : Eio.Net.Sockaddr.stream -> Eio.Net.stream_socket -> unit =
+let connection_handler ~sw : Eio.Net.Sockaddr.stream -> _ Eio.Net.stream_socket -> unit =
   let module Body = Httpaf.Body in
   let module Headers = Httpaf.Headers in
   let module Reqd = Httpaf.Reqd in
