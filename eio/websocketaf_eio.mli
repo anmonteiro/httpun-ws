@@ -7,7 +7,7 @@ module Server : sig
     -> websocket_handler : (Eio.Net.Sockaddr.stream -> Wsd.t -> Websocket_connection.input_handlers)
     -> error_handler : (Eio.Net.Sockaddr.stream -> Server_connection.error_handler)
     -> sw:Eio.Switch.t
-    -> (Eio.Net.Sockaddr.stream -> #Eio.Flow.two_way -> unit)
+    -> (Eio.Net.Sockaddr.stream -> _ Eio.Net.stream_socket -> unit)
 end
 
 module Client : sig
@@ -23,7 +23,7 @@ module Client : sig
     -> resource       : string
     -> error_handler : (Client_connection.error -> unit)
     -> websocket_handler : (Wsd.t -> Websocket_connection.input_handlers)
-    -> #Eio.Flow.two_way
+    -> Eio_unix.Net.stream_socket_ty Eio.Net.stream_socket
     -> t
 
   val is_closed : t -> bool

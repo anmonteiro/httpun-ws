@@ -65,7 +65,7 @@ let () =
 
       let p, u = Promise.create () in
       let nonce = "0123456789ABCDEF" in
-      let conn = Httpaf_eio.Client.create_connection ~sw (socket :> Eio.Net.stream_socket)  in
+      let conn = Httpaf_eio.Client.create_connection ~sw socket in
       let upgrade_request = Websocketaf.Handshake.create_request
         ~nonce
         ~headers:Httpaf.Headers.(of_list

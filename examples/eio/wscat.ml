@@ -73,7 +73,7 @@ let () =
       let resource = "/" in
       let port = !port in
       let _client : Websocketaf_eio.Client.t = Websocketaf_eio.Client.connect
-        (socket :> Eio.Net.stream_socket)
+        socket
         ~sw
         ~nonce
         ~host
