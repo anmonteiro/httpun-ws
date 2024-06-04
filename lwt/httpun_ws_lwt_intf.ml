@@ -32,21 +32,36 @@
     POSSIBILITY OF SUCH DAMAGE.
   ----------------------------------------------------------------------------*)
 
-open Websocketaf
+open Httpun_ws
 
 module type Server = sig
   type socket
 
+  type addr
+
   val create_connection_handler
-    :  ?config : Httpaf.Config.t
-    -> websocket_handler : (Wsd.t -> Websocket_connection.input_handlers)
-    -> error_handler : Server_connection.error_handler
-    -> socket
-    -> unit Lwt.t
+    :  ?config : Httpun.Config.t
+    -> websocket_handler : (addr -> Wsd.t -> Websocket_connection.input_handlers)
+    -> error_handler : (addr -> Httpun_ws.Server_connection.error_handler)
+    -> (addr -> socket -> unit Lwt.t)
 end
 
-module Server (Flow : Mirage_flow.S) : Server with type socket = Flow.flow
 
-module type Client = Websocketaf_lwt.Client
+module type Client = sig
+  type t
+  type socket
 
-module Client (Flow : Mirage_flow.S) : Client with type socket = Flow.flow
+  (* Perform HTTP/1.1 handshake and upgrade to WS. *)
+  val connect
+    :  ?config : Httpun.Config.t
+    -> nonce             : string
+    -> host              : string
+    -> port              : int
+    -> resource          : string
+    -> error_handler : (Client_connection.error -> unit)
+    -> websocket_handler : (Wsd.t -> Websocket_connection.input_handlers)
+    -> socket
+    -> t Lwt.t
+
+  val is_closed : t -> bool
+end

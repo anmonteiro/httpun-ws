@@ -1,8 +1,8 @@
 (executables
  (names wscat echo_server echo_server_upgrade)
  (libraries
-  websocketaf
-  websocketaf-async
+  httpun-ws
+  httpun-ws-async
   async
-  httpaf-async
+  httpun-async
   core_unix.command_unix))

@@ -2,11 +2,11 @@ open Core
 open Async
 
 let connection_handler : ([< Socket.Address.t] as 'a) -> ([`Active], 'a) Socket.t -> unit Deferred.t =
-  let module Body = Httpaf.Body in
-  let module Headers = Httpaf.Headers in
-  let module Reqd = Httpaf.Reqd in
-  let module Response = Httpaf.Response in
-  let module Status = Httpaf.Status in
+  let module Body = Httpun.Body in
+  let module Headers = Httpun.Headers in
+  let module Reqd = Httpun.Reqd in
+  let module Response = Httpun.Response in
+  let module Status = Httpun.Status in
 
   let websocket_handler (_: [< Socket.Address.t]) wsd =
     let frame ~opcode ~is_fin:_ ~len:_ payload =
@@ -14,23 +14,23 @@ let connection_handler : ([< Socket.Address.t] as 'a) -> ([`Active], 'a) Socket.
       | `Continuation
       | `Text
       | `Binary ->
-         Websocketaf.Payload.schedule_read payload
+         Httpun_ws.Payload.schedule_read payload
            ~on_eof:ignore
            ~on_read:(fun bs ~off ~len ->
-           Websocketaf.Wsd.schedule wsd bs ~kind:`Text ~off ~len)
+           Httpun_ws.Wsd.schedule wsd bs ~kind:`Text ~off ~len)
       | `Connection_close ->
-        Websocketaf.Wsd.close wsd
+        Httpun_ws.Wsd.close wsd
       | `Ping ->
-        Websocketaf.Wsd.send_ping wsd
+        Httpun_ws.Wsd.send_ping wsd
       | `Pong
       | `Other _ ->
         ()
     in
     let eof () =
       Log.Global.error "EOF\n%!";
-      Websocketaf.Wsd.close wsd
+      Httpun_ws.Wsd.close wsd
     in
-    { Websocketaf.Websocket_connection.frame
+    { Httpun_ws.Websocket_connection.frame
     ; eof
     }
   in
@@ -38,12 +38,12 @@ let connection_handler : ([< Socket.Address.t] as 'a) -> ([`Active], 'a) Socket.
   let error_handler _client_address wsd (`Exn exn) =
     let message = Exn.to_string exn in
     let payload = Bytes.of_string message in
-    Websocketaf.Wsd.send_bytes wsd ~kind:`Text payload ~off:0
+    Httpun_ws.Wsd.send_bytes wsd ~kind:`Text payload ~off:0
       ~len:(Bytes.length payload);
-    Websocketaf.Wsd.close wsd
+    Httpun_ws.Wsd.close wsd
   in
 
-  Websocketaf_async.Server.create_connection_handler
+  Httpun_ws_async.Server.create_connection_handler
     ?config:None
     ~websocket_handler
     ~error_handler

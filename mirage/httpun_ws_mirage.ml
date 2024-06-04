@@ -32,36 +32,49 @@
     POSSIBILITY OF SUCH DAMAGE.
   ----------------------------------------------------------------------------*)
 
-open Websocketaf
+module Server (Flow : Mirage_flow.S) = struct
+  type socket = Flow.flow
 
+  module Server_runtime = Httpun_ws_lwt.Server (Gluten_mirage.Server (Flow))
+
+  let create_connection_handler ?config ~websocket_handler ~error_handler =
+    fun flow ->
+      let websocket_handler = fun () -> websocket_handler in
+      let error_handler = fun () -> error_handler in
+      Server_runtime.create_connection_handler
+       ?config
+       ~websocket_handler
+       ~error_handler
+       ()
+       (Gluten_mirage.Buffered_flow.create flow)
+end
+
+(* Almost like the `Httpun_ws_lwt.Server` module type but we don't need the
+ * client address argument in Mirage. It's somewhere else. *)
 module type Server = sig
+  open Httpun_ws
   type socket
-
-  type addr
 
   val create_connection_handler
-    :  ?config : Httpaf.Config.t
-    -> websocket_handler : (addr -> Wsd.t -> Websocket_connection.input_handlers)
-    -> error_handler : (addr -> Websocketaf.Server_connection.error_handler)
-    -> (addr -> socket -> unit Lwt.t)
-end
-
-
-module type Client = sig
-  type t
-  type socket
-
-  (* Perform HTTP/1.1 handshake and upgrade to WS. *)
-  val connect
-    :  ?config : Httpaf.Config.t
-    -> nonce             : string
-    -> host              : string
-    -> port              : int
-    -> resource          : string
-    -> error_handler : (Client_connection.error -> unit)
+    :  ?config : Httpun.Config.t
     -> websocket_handler : (Wsd.t -> Websocket_connection.input_handlers)
+    -> error_handler : Server_connection.error_handler
     -> socket
-    -> t Lwt.t
-
-  val is_closed : t -> bool
+    -> unit Lwt.t
 end
+
+module type Client = Httpun_ws_lwt.Client
+
+module Client (Flow : Mirage_flow.S) = struct
+    include Httpun_ws_lwt.Client (Gluten_mirage.Client (Flow))
+    type socket = Flow.flow
+
+
+  let connect
+        ?config ~nonce ~host ~port ~resource ~error_handler
+        ~websocket_handler flow =
+    connect
+      ?config ~nonce ~host ~port ~resource
+      ~error_handler ~websocket_handler
+      (Gluten_mirage.Buffered_flow.create flow)
+  end

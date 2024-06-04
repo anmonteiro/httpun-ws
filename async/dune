@@ -1,7 +1,7 @@
 (library
- (name websocketaf_async)
- (public_name websocketaf-async)
- (libraries async core faraday-async gluten-async websocketaf digestif.ocaml
+ (name httpun_ws_async)
+ (public_name httpun-ws-async)
+ (libraries async core faraday-async gluten-async httpun-ws digestif.ocaml
    base64)
  (flags
   (:standard -safe-string)))

@@ -1,10 +1,13 @@
 opam-version: "2.0"
-maintainer: "Spiros Eliopoulos <spiros@inhabitedtype.com>"
-authors: [ "Spiros Eliopoulos <spiros@inhabitedtype.com>" ]
+maintainer: "Antonio Nuno Monteiro <anmonteiro@gmail.com>"
+authors: [
+  "Spiros Eliopoulos <spiros@inhabitedtype.com>"
+  "Antonio Nuno Monteiro <anmonteiro@gmail.com>"
+]
 license: "BSD-3-clause"
-homepage: "https://github.com/inhabitedtype/websocketaf"
-bug-reports: "https://github.com/inhabitedtype/websocketaf/issues"
-dev-repo: "git+https://github.com/inhabitedtype/websocketaf.git"
+homepage: "https://github.com/anmonteiro/httpun-ws"
+bug-reports: "https://github.com/anmonteiro/httpun-ws/issues"
+dev-repo: "git+https://github.com/anmonteiro/httpun-ws.git"
 build: [
   ["dune" "subst"] {pinned}
   ["dune" "build" "-p" name "-j" jobs]
@@ -19,7 +22,7 @@ depends: [
   "angstrom" {>= "0.14.0"}
   "faraday"  {>= "0.5.0"}
   "gluten" {>= "0.2.0"}
-  "httpaf"
+  "httpun"
   "result"
 ]
 synopsis:

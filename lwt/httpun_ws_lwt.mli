@@ -1,6 +1,6 @@
-module type Server = Websocketaf_lwt_intf.Server
+module type Server = Httpun_ws_lwt_intf.Server
 
-module type Client = Websocketaf_lwt_intf.Client
+module type Client = Httpun_ws_lwt_intf.Client
 
 (* The function that results from [create_connection_handler] should be passed
    to [Lwt_io.establish_server_with_client_socket]. For an example, see

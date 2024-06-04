@@ -25,30 +25,30 @@ let
 
   inherit (pkgs) lib stdenv fetchTarball ocamlPackages;
 
-  websocketafPkgs = pkgs.callPackage ./.. {
+  httpun-wsPkgs = pkgs.callPackage ./.. {
     inherit nix-filter;
     doCheck = true;
   };
-  websocketafDrvs = lib.filterAttrs (_: value: lib.isDerivation value) websocketafPkgs;
+  httpun-wsDrvs = lib.filterAttrs (_: value: lib.isDerivation value) httpun-wsPkgs;
   isOCaml5 = lib.hasPrefix "5_" ocamlVersion;
 
 in
 
 stdenv.mkDerivation {
-  name = "websocketaf-examples";
+  name = "httpun-ws-examples";
   src = ./../..;
   dontBuild = true;
   installPhase = ''
     touch $out
   '';
-  buildInputs = (lib.attrValues websocketafDrvs) ++
+  buildInputs = (lib.attrValues httpun-wsDrvs) ++
     (with ocamlPackages; [
       ocaml
       dune
       findlib
-      httpaf-lwt-unix
-      httpaf-async
-    ] ++ lib.optional isOCaml5 httpaf-eio);
+      httpun-lwt-unix
+      httpun-async
+    ] ++ lib.optional isOCaml5 httpun-eio);
   doCheck = true;
   checkPhase = ''
     ${ if !isOCaml5 then "rm -rf ./examples/eio" else "" }

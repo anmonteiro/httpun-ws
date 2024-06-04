@@ -6,16 +6,16 @@ let websocket_handler env ~sw u wsd =
       let line = Eio.Buf_read.line buf in
       traceln "> %s" line;
       let payload = Bytes.of_string line in
-      Websocketaf.Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
+      Httpun_ws.Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
       if line = "exit" then begin
-        Websocketaf.Wsd.close wsd;
+        Httpun_ws.Wsd.close wsd;
       end else
         input_loop buf wsd ()
   in
   let buf = Eio.Buf_read.of_flow stdin ~initial_size:100 ~max_size:1_000_000 in
   Eio.Fiber.fork ~sw (input_loop buf wsd);
   let frame ~opcode:_ ~is_fin:_ ~len:_ payload =
-    Websocketaf.Payload.schedule_read payload
+    Httpun_ws.Payload.schedule_read payload
       ~on_eof:ignore
       ~on_read:(fun bs ~off ~len ->
     let payload = Bytes.create len in
@@ -27,13 +27,13 @@ let websocket_handler env ~sw u wsd =
     Printf.eprintf "[EOF]\n%!";
     Promise.resolve u ()
   in
-  { Websocketaf.Websocket_connection.frame
+  { Httpun_ws.Websocket_connection.frame
   ; eof
   }
 
 let error_handler = function
   | `Handshake_failure (rsp, _body) ->
-    Format.eprintf "Handshake failure: %a\n%!" Httpaf.Response.pp_hum rsp
+    Format.eprintf "Handshake failure: %a\n%!" Httpun.Response.pp_hum rsp
   | _ -> assert false
 
 let () =
@@ -72,7 +72,7 @@ let () =
       let nonce = "0123456789ABCDEF" in
       let resource = "/" in
       let port = !port in
-      let _client : Websocketaf_eio.Client.t = Websocketaf_eio.Client.connect
+      let _client : Httpun_ws_eio.Client.t = Httpun_ws_eio.Client.connect
         socket
         ~sw
         ~nonce

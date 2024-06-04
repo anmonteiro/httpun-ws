@@ -4,16 +4,16 @@ let websocket_handler u wsd =
   let rec input_loop wsd () =
     Lwt_io.(read_line stdin) >>= fun line ->
     let payload = Bytes.of_string line in
-    Websocketaf.Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
+    Httpun_ws.Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
     if line = "exit" then begin
-      Websocketaf.Wsd.close wsd;
+      Httpun_ws.Wsd.close wsd;
       Lwt.return_unit
     end else
       input_loop wsd ()
   in
   Lwt.async (input_loop wsd);
   let frame ~opcode:_ ~is_fin:_ ~len:_ payload =
-    Websocketaf.Payload.schedule_read payload
+    Httpun_ws.Payload.schedule_read payload
       ~on_eof:ignore
       ~on_read:(fun bs ~off ~len ->
     let payload = Bytes.create len in
@@ -27,7 +27,7 @@ let websocket_handler u wsd =
     Printf.eprintf "[EOF]\n%!";
     Lwt.wakeup_later u ()
   in
-  { Websocketaf.Websocket_connection.frame
+  { Httpun_ws.Websocket_connection.frame
   ; eof
   }
 
@@ -55,25 +55,25 @@ let () =
     >>= fun () ->
 
     let nonce = "0123456789ABCDEF" in
-    Httpaf_lwt_unix.Client.create_connection socket >>= fun conn ->
-      let upgrade_request = Websocketaf.Handshake.create_request
+    Httpun_lwt_unix.Client.create_connection socket >>= fun conn ->
+      let upgrade_request = Httpun_ws.Handshake.create_request
         ~nonce
-        ~headers:Httpaf.Headers.(of_list
+        ~headers:Httpun.Headers.(of_list
           ["host", String.concat ":" [host; string_of_int !port]])
         "/"
       in
       let p, u = Lwt.wait () in
-      let request_body = Httpaf_lwt_unix.Client.request
+      let request_body = Httpun_lwt_unix.Client.request
         conn
         ~error_handler:(fun _ -> assert false)
         ~response_handler:(fun _response _response_body ->
           let ws_conn =
-            Websocketaf.Client_connection.create (websocket_handler u)
+            Httpun_ws.Client_connection.create (websocket_handler u)
           in
-          Httpaf_lwt_unix.Client.upgrade conn
-            (Gluten.make (module Websocketaf.Client_connection) ws_conn))
+          Httpun_lwt_unix.Client.upgrade conn
+            (Gluten.make (module Httpun_ws.Client_connection) ws_conn))
         upgrade_request
     in
-    Httpaf.Body.Writer.close request_body;
+    Httpun.Body.Writer.close request_body;
     p
   end

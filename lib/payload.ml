@@ -32,7 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *----------------------------------------------------------------------------*)
 
-module IOVec = Httpaf.IOVec
+module IOVec = Httpun.IOVec
 
   type t =
   { faraday : Faraday.t

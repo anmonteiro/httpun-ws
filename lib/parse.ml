@@ -183,7 +183,7 @@ module Reader = struct
       committed
   and start t state =
       match state with
-      | AU.Done _         -> failwith "websocketaf.Reader.unable to start parser"
+      | AU.Done _         -> failwith "httpun-ws.Reader.unable to start parser"
       | AU.Fail(0, marks, msg) ->
         t.parse_state <- Fail (`Parse(marks, msg))
       | AU.Partial { committed = 0; continue } ->

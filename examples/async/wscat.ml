@@ -6,9 +6,9 @@ let websocket_handler wsd =
     Reader.read_line (Lazy.force Reader.stdin) >>= function
     | `Ok line ->
       let payload = Bytes.of_string line in
-      Websocketaf.Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
+      Httpun_ws.Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
       if String.(line = "exit") then begin
-        Websocketaf.Wsd.close wsd;
+        Httpun_ws.Wsd.close wsd;
         Deferred.return ()
       end else
         input_loop wsd ()
@@ -16,7 +16,7 @@ let websocket_handler wsd =
   in
   Deferred.don't_wait_for (input_loop wsd ());
   let frame ~opcode:_ ~is_fin:_ ~len:_ payload =
-    Websocketaf.Payload.schedule_read payload
+    Httpun_ws.Payload.schedule_read payload
       ~on_eof:ignore
       ~on_read:(fun bs ~off ~len ->
     let payload = Bytes.to_string (Bigstring.to_bytes ~pos:off ~len bs) in
@@ -26,13 +26,13 @@ let websocket_handler wsd =
   let eof () =
     Log.Global.error "[EOF]\n%!"
   in
-  { Websocketaf.Websocket_connection.frame
+  { Httpun_ws.Websocket_connection.frame
   ; eof
   }
 
 let error_handler = function
   | `Handshake_failure (rsp, _body) ->
-    Format.eprintf "Handshake failure: %a\n%!" Httpaf.Response.pp_hum rsp
+    Format.eprintf "Handshake failure: %a\n%!" Httpun.Response.pp_hum rsp
   | _ -> assert false
 
 let main port host () =
@@ -41,7 +41,7 @@ let main port host () =
   >>= fun socket ->
     let nonce = "0123456789ABCDEF" in
     let resource = "/" in
-    Websocketaf_async.Client.connect
+    Httpun_ws_async.Client.connect
       socket
       ~nonce
       ~host

@@ -1,4 +1,4 @@
-module Headers = Httpaf.Headers
+module Headers = Httpun.Headers
 
 type state =
   | Handshake of Client_handshake.t
@@ -7,8 +7,8 @@ type state =
 type t = { mutable state: state }
 
 type error =
-  [ Httpaf.Client_connection.error
-  | `Handshake_failure of Httpaf.Response.t * Httpaf.Body.Reader.t ]
+  [ Httpun.Client_connection.error
+  | `Handshake_failure of Httpun.Response.t * Httpun.Body.Reader.t ]
 
 let passes_scrutiny ~status ~accept headers =
  (*
@@ -71,19 +71,19 @@ let handshake_exn t =
 
 let connect
     ~nonce
-    ?(headers = Httpaf.Headers.empty)
+    ?(headers = Httpun.Headers.empty)
     ~sha1
     ~error_handler
     ~websocket_handler
     target
   =
   let rec response_handler response response_body =
-    let { Httpaf.Response.status; headers; _  } = response in
+    let { Httpun.Response.status; headers; _  } = response in
     let t = Lazy.force t in
     let nonce = Base64.encode_exn nonce in
     let accept = Handshake.sec_websocket_key_proof ~sha1 nonce in
     if passes_scrutiny ~status ~accept headers then begin
-      Httpaf.Body.Reader.close response_body;
+      Httpun.Body.Reader.close response_body;
       let handshake = handshake_exn t in
       t.state <-
         Websocket
@@ -98,7 +98,7 @@ let connect
     { state = Handshake (Client_handshake.create
         ~nonce
         ~headers
-        ~error_handler:(error_handler :> Httpaf.Client_connection.error_handler)
+        ~error_handler:(error_handler :> Httpun.Client_connection.error_handler)
         ~response_handler
         target) }
   in

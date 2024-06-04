@@ -32,49 +32,21 @@
     POSSIBILITY OF SUCH DAMAGE.
   ----------------------------------------------------------------------------*)
 
-module Server (Flow : Mirage_flow.S) = struct
-  type socket = Flow.flow
+open Httpun_ws
 
-  module Server_runtime = Websocketaf_lwt.Server (Gluten_mirage.Server (Flow))
-
-  let create_connection_handler ?config ~websocket_handler ~error_handler =
-    fun flow ->
-      let websocket_handler = fun () -> websocket_handler in
-      let error_handler = fun () -> error_handler in
-      Server_runtime.create_connection_handler
-       ?config
-       ~websocket_handler
-       ~error_handler
-       ()
-       (Gluten_mirage.Buffered_flow.create flow)
-end
-
-(* Almost like the `Websocketaf_lwt.Server` module type but we don't need the
- * client address argument in Mirage. It's somewhere else. *)
 module type Server = sig
-  open Websocketaf
   type socket
 
   val create_connection_handler
-    :  ?config : Httpaf.Config.t
+    :  ?config : Httpun.Config.t
     -> websocket_handler : (Wsd.t -> Websocket_connection.input_handlers)
     -> error_handler : Server_connection.error_handler
     -> socket
     -> unit Lwt.t
 end
 
-module type Client = Websocketaf_lwt.Client
+module Server (Flow : Mirage_flow.S) : Server with type socket = Flow.flow
 
-module Client (Flow : Mirage_flow.S) = struct
-    include Websocketaf_lwt.Client (Gluten_mirage.Client (Flow))
-    type socket = Flow.flow
+module type Client = Httpun_ws_lwt.Client
 
-
-  let connect
-        ?config ~nonce ~host ~port ~resource ~error_handler
-        ~websocket_handler flow =
-    connect
-      ?config ~nonce ~host ~port ~resource
-      ~error_handler ~websocket_handler
-      (Gluten_mirage.Buffered_flow.create flow)
-  end
+module Client (Flow : Mirage_flow.S) : Client with type socket = Flow.flow

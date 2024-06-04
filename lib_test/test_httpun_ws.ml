@@ -1,15 +1,15 @@
 module Websocket = struct
-  module Client_connection = Websocketaf.Client_connection
-  module Opcode = Websocketaf.Websocket.Opcode
-  module Websocket_connection = Websocketaf.Websocket_connection
-  module Wsd = Websocketaf.Wsd
+  module Client_connection = Httpun_ws.Client_connection
+  module Opcode = Httpun_ws.Websocket.Opcode
+  module Websocket_connection = Httpun_ws.Websocket_connection
+  module Wsd = Httpun_ws.Wsd
 
   module Testable = struct
     let opcode = Alcotest.testable Opcode.pp_hum (=)
   end
 
   module Parser = struct
-    open Websocketaf__
+    open Httpun_ws__
 
     let parse_frame serialized_frame =
       let parser =
@@ -199,10 +199,10 @@ module Websocket = struct
     let rev_payload_chunks = ref [] in
     let rec on_read bs ~off ~len =
       rev_payload_chunks := Bigstringaf.substring bs ~off ~len :: !rev_payload_chunks;
-      Websocketaf.Payload.schedule_read payload ~on_eof ~on_read
+      Httpun_ws.Payload.schedule_read payload ~on_eof ~on_read
     and on_eof () = f !rev_payload_chunks
     in
-    Websocketaf.Payload.schedule_read payload ~on_eof ~on_read
+    Httpun_ws.Payload.schedule_read payload ~on_eof ~on_read
 
   let test_reading_text_frame () =
     let handler_called = ref false in
@@ -273,7 +273,7 @@ module Websocket = struct
 end
 
 let () =
-  Alcotest.run "websocketaf unit tests"
+  Alcotest.run "httpun-ws unit tests"
     [ "websocket frame parsing", Websocket.Parser.tests
     ; "reading", Websocket.tests
     ]

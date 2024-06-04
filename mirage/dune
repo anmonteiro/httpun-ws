@@ -1,11 +1,11 @@
 (library
- (name websocketaf_mirage)
- (public_name websocketaf-mirage)
+ (name httpun_ws_mirage)
+ (public_name httpun-ws-mirage)
  (libraries
   faraday-lwt
-  websocketaf
+  httpun-ws
   gluten-mirage
-  websocketaf-lwt
+  httpun-ws-lwt
   lwt
   mirage-flow
   cstruct)

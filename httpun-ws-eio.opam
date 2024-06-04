@@ -1,0 +1,20 @@
+opam-version: "2.0"
+name: "httpun-ws-eio"
+maintainer: "Antonio Nuno Monteiro <anmonteiro@gmail.com>"
+authors: [ "Antonio Nuno Monteiro <anmonteiro@gmail.com>" ]
+license: "BSD-3-clause"
+homepage: "https://github.com/anmonteiro/httpun-ws"
+bug-reports: "https://github.com/anmonteiro/httpun-ws/issues"
+dev-repo: "git+https://github.com/anmonteiro/httpun-ws.git"
+build: [
+  ["dune" "subst" "-p" name] {pinned}
+  ["dune" "build" "-p" name "-j" jobs]
+]
+depends: [
+  "ocaml" {>= "4.03.0"}
+  "httpun-ws"
+  "dune" {build}
+  "digestif"
+  "gluten-eio"
+]
+synopsis: "Lwt support for websocket/af"

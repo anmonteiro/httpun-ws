@@ -1,4 +1,4 @@
-module IOVec = Httpaf.IOVec
+module IOVec = Httpun.IOVec
 
 type error = [ `Exn of exn ]
 

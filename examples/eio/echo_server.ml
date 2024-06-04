@@ -1,31 +1,31 @@
 let connection_handler ~sw : Eio.Net.Sockaddr.stream -> _ Eio.Net.stream_socket -> unit =
-  let module Body = Httpaf.Body in
-  let module Headers = Httpaf.Headers in
-  let module Reqd = Httpaf.Reqd in
-  let module Response = Httpaf.Response in
-  let module Status = Httpaf.Status in
+  let module Body = Httpun.Body in
+  let module Headers = Httpun.Headers in
+  let module Reqd = Httpun.Reqd in
+  let module Response = Httpun.Response in
+  let module Status = Httpun.Status in
 
   let websocket_handler _client_address wsd =
     let frame ~opcode ~is_fin:_ ~len:_ payload =
-      match (opcode: Websocketaf.Websocket.Opcode.t) with
-      | #Websocketaf.Websocket.Opcode.standard_non_control as opcode ->
-        Websocketaf.Payload.schedule_read payload
+      match (opcode: Httpun_ws.Websocket.Opcode.t) with
+      | #Httpun_ws.Websocket.Opcode.standard_non_control as opcode ->
+        Httpun_ws.Payload.schedule_read payload
           ~on_eof:ignore
           ~on_read:(fun bs ~off ~len ->
-          Websocketaf.Wsd.schedule wsd bs ~kind:opcode ~off ~len)
+          Httpun_ws.Wsd.schedule wsd bs ~kind:opcode ~off ~len)
       | `Connection_close ->
-        Websocketaf.Wsd.close wsd
+        Httpun_ws.Wsd.close wsd
       | `Ping ->
-        Websocketaf.Wsd.send_pong wsd
+        Httpun_ws.Wsd.send_pong wsd
       | `Pong
       | `Other _ ->
         ()
     in
     let eof () =
       Format.eprintf "EOF\n%!";
-      Websocketaf.Wsd.close wsd
+      Httpun_ws.Wsd.close wsd
     in
-    { Websocketaf.Websocket_connection.frame
+    { Httpun_ws.Websocket_connection.frame
     ; eof
     }
   in
@@ -33,12 +33,12 @@ let connection_handler ~sw : Eio.Net.Sockaddr.stream -> _ Eio.Net.stream_socket 
   let error_handler _client_address wsd (`Exn exn) =
     let message = Printexc.to_string exn in
     let payload = Bytes.of_string message in
-    Websocketaf.Wsd.send_bytes wsd ~kind:`Text payload ~off:0
+    Httpun_ws.Wsd.send_bytes wsd ~kind:`Text payload ~off:0
       ~len:(Bytes.length payload);
-    Websocketaf.Wsd.close wsd
+    Httpun_ws.Wsd.close wsd
   in
 
-  Websocketaf_eio.Server.create_connection_handler
+  Httpun_ws_eio.Server.create_connection_handler
     ?config:None
     ~websocket_handler
     ~error_handler

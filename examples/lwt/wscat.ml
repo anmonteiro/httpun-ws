@@ -4,16 +4,16 @@ let websocket_handler u wsd =
   let rec input_loop wsd () =
     Lwt_io.(read_line stdin) >>= fun line ->
     let payload = Bytes.of_string line in
-    Websocketaf.Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
+    Httpun_ws.Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
     if line = "exit" then begin
-      Websocketaf.Wsd.close wsd;
+      Httpun_ws.Wsd.close wsd;
       Lwt.return_unit
     end else
       input_loop wsd ()
   in
   Lwt.async (input_loop wsd);
   let frame ~opcode:_ ~is_fin:_ ~len:_ payload =
-    Websocketaf.Payload.schedule_read payload
+    Httpun_ws.Payload.schedule_read payload
       ~on_eof:ignore
       ~on_read:(fun bs ~off ~len ->
     let payload = Bytes.create len in
@@ -28,13 +28,13 @@ let websocket_handler u wsd =
     Printf.eprintf "[EOF]\n%!";
     Lwt.wakeup_later u ()
   in
-  { Websocketaf.Websocket_connection.frame
+  { Httpun_ws.Websocket_connection.frame
   ; eof
   }
 
 let error_handler = function
   | `Handshake_failure (rsp, _body) ->
-    Format.eprintf "Handshake failure: %a\n%!" Httpaf.Response.pp_hum rsp
+    Format.eprintf "Handshake failure: %a\n%!" Httpun.Response.pp_hum rsp
   | _ -> assert false
 
 let () =
@@ -64,7 +64,7 @@ let () =
     let nonce = "0123456789ABCDEF" in
     let resource = "/" in
     let port = !port in
-    Websocketaf_lwt_unix.Client.connect
+    Httpun_ws_lwt_unix.Client.connect
       socket
       ~nonce
       ~host

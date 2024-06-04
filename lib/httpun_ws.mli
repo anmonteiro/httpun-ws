@@ -1,4 +1,4 @@
-module IOVec = Httpaf.IOVec
+module IOVec = Httpun.IOVec
 
 module Payload : sig
   type t
@@ -124,20 +124,20 @@ end
 module Handshake : sig
   val create_request
     :  nonce:string
-    -> headers:Httpaf.Headers.t
+    -> headers:Httpun.Headers.t
     -> string
-    -> Httpaf.Request.t
+    -> Httpun.Request.t
 
   val upgrade_headers
   :  sha1:(string -> string)
-  -> request_method:Httpaf.Method.t
-  -> Httpaf.Headers.t
+  -> request_method:Httpun.Method.t
+  -> Httpun.Headers.t
   -> ((string * string) list, string) result
 
   val respond_with_upgrade
-  : ?headers:Httpaf.Headers.t
+  : ?headers:Httpun.Headers.t
   -> sha1:(string -> string)
-  -> Httpaf.Reqd.t
+  -> Httpun.Reqd.t
   -> (unit -> unit)
   -> (unit, string) result
 end
@@ -152,12 +152,12 @@ module Client_connection : sig
   type t
 
   type error =
-    [ Httpaf.Client_connection.error
-    | `Handshake_failure of Httpaf.Response.t * Httpaf.Body.Reader.t ]
+    [ Httpun.Client_connection.error
+    | `Handshake_failure of Httpun.Response.t * Httpun.Body.Reader.t ]
 
   val connect
     :  nonce             : string
-    -> ?headers          : Httpaf.Headers.t
+    -> ?headers          : Httpun.Headers.t
     -> sha1              : (string -> string)
     -> error_handler     : (error -> unit)
     -> websocket_handler : (Wsd.t -> Websocket_connection.input_handlers)

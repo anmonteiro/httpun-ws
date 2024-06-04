@@ -1,6 +1,6 @@
 (library
- (name websocketaf_lwt_unix)
- (public_name websocketaf-lwt-unix)
- (libraries gluten-lwt-unix faraday-lwt-unix websocketaf-lwt lwt.unix)
+ (name httpun_ws_lwt_unix)
+ (public_name httpun-ws-lwt-unix)
+ (libraries gluten-lwt-unix faraday-lwt-unix httpun-ws-lwt lwt.unix)
  (flags
   (:standard -safe-string)))

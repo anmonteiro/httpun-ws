@@ -6,16 +6,16 @@ let websocket_handler env ~sw u wsd =
       let line = Eio.Buf_read.line buf in
       traceln "> %s" line;
       let payload = Bytes.of_string line in
-      Websocketaf.Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
+      Httpun_ws.Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
       if line = "exit" then begin
-        Websocketaf.Wsd.close wsd;
+        Httpun_ws.Wsd.close wsd;
       end else
         input_loop buf wsd ()
   in
   let buf = Eio.Buf_read.of_flow stdin ~initial_size:100 ~max_size:1_000_000 in
   Eio.Fiber.fork ~sw (input_loop buf wsd);
   let frame ~opcode:_ ~is_fin:_ ~len:_ payload =
-    Websocketaf.Payload.schedule_read payload
+    Httpun_ws.Payload.schedule_read payload
       ~on_eof:ignore
       ~on_read:(fun bs ~off ~len ->
     let payload = Bytes.create len in
@@ -27,7 +27,7 @@ let websocket_handler env ~sw u wsd =
     Printf.eprintf "[EOF]\n%!";
     Promise.resolve u ()
   in
-  { Websocketaf.Websocket_connection.frame
+  { Httpun_ws.Websocket_connection.frame
   ; eof
   }
 
@@ -65,23 +65,23 @@ let () =
 
       let p, u = Promise.create () in
       let nonce = "0123456789ABCDEF" in
-      let conn = Httpaf_eio.Client.create_connection ~sw socket in
-      let upgrade_request = Websocketaf.Handshake.create_request
+      let conn = Httpun_eio.Client.create_connection ~sw socket in
+      let upgrade_request = Httpun_ws.Handshake.create_request
         ~nonce
-        ~headers:Httpaf.Headers.(of_list
+        ~headers:Httpun.Headers.(of_list
           ["host", String.concat ":" [host; string_of_int !port]])
         "/"
       in
-      let request_body = Httpaf_eio.Client.request
+      let request_body = Httpun_eio.Client.request
         conn
         ~error_handler:(fun _ -> assert false)
         ~response_handler:(fun _response _response_body ->
           let ws_conn =
-            Websocketaf.Client_connection.create (websocket_handler env ~sw u)
+            Httpun_ws.Client_connection.create (websocket_handler env ~sw u)
           in
-          Httpaf_eio.Client.upgrade conn
-            (Gluten.make (module Websocketaf.Client_connection) ws_conn))
+          Httpun_eio.Client.upgrade conn
+            (Gluten.make (module Httpun_ws.Client_connection) ws_conn))
         upgrade_request
       in
-      Httpaf.Body.Writer.close request_body;
+      Httpun.Body.Writer.close request_body;
       Promise.await p))

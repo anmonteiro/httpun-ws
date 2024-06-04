@@ -1,4 +1,4 @@
 (library
- (name websocketaf)
- (public_name websocketaf)
- (libraries gluten base64 angstrom faraday httpaf bigstringaf))
+ (name httpun_ws)
+ (public_name httpun-ws)
+ (libraries gluten base64 angstrom faraday httpun bigstringaf))

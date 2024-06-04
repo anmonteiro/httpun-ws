@@ -1,4 +1,4 @@
-module Headers = Httpaf.Headers
+module Headers = Httpun.Headers
 
 let create_request ~nonce ~headers target =
   let nonce = Base64.encode_exn nonce in
@@ -11,7 +11,7 @@ let create_request ~nonce ~headers target =
       ; "sec-websocket-key"    , nonce
       ]
   in
-  Httpaf.Request.create ~headers `GET target
+  Httpun.Request.create ~headers `GET target
 
 let sec_websocket_key_proof ~sha1 sec_websocket_key =
   (* From RFC6455§1.3:
@@ -117,9 +117,9 @@ let upgrade_headers ~sha1 ~request_method headers =
     Error "Didn't pass scrutiny"
 
 let respond_with_upgrade ?(headers=Headers.empty) ~sha1 reqd upgrade_handler =
-  let request = Httpaf.Reqd.request reqd in
+  let request = Httpun.Reqd.request reqd in
   match upgrade_headers ~sha1 ~request_method:request.meth request.headers with
   | Ok upgrade_headers ->
-    Httpaf.Reqd.respond_with_upgrade reqd (Headers.add_list headers upgrade_headers) upgrade_handler;
+    Httpun.Reqd.respond_with_upgrade reqd (Headers.add_list headers upgrade_headers) upgrade_handler;
     Ok ()
   | Error msg -> Error msg

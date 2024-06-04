@@ -8,17 +8,17 @@ let
       root = ./..;
       include = [ "dune-project" ] ++ files ++ (builtins.map inDirectory dirs);
     };
-  buildWebsocketaf = args: buildDunePackage ({
+  buildHttpun-ws = args: buildDunePackage ({
     version = "0.0.1-dev";
     useDune2 = true;
   } // args);
 
-  websocketafPackages = rec {
-    websocketaf = buildWebsocketaf {
-      pname = "websocketaf";
+  httpun-wsPackages = rec {
+    httpun-ws = buildHttpun-ws {
+      pname = "httpun-ws";
       src = genSrc {
         dirs = [ "lib" "lib_test" ];
-        files = [ "websocketaf.opam" ];
+        files = [ "httpun-ws.opam" ];
       };
       buildInputs = [ alcotest ];
       doCheck = true;
@@ -26,46 +26,46 @@ let
         angstrom
         faraday
         gluten
-        httpaf
+        httpun
         base64
       ];
     };
 
     # These two don't have tests
-    websocketaf-lwt = buildWebsocketaf {
-      pname = "websocketaf-lwt";
+    httpun-ws-lwt = buildHttpun-ws {
+      pname = "httpun-ws-lwt";
       src = genSrc {
         dirs = [ "lwt" ];
-        files = [ "websocketaf-lwt.opam" ];
+        files = [ "httpun-ws-lwt.opam" ];
       };
       doCheck = false;
-      propagatedBuildInputs = [ gluten-lwt websocketaf lwt digestif ];
+      propagatedBuildInputs = [ gluten-lwt httpun-ws lwt digestif ];
     };
 
-    websocketaf-lwt-unix = buildWebsocketaf {
-      pname = "websocketaf-lwt-unix";
+    httpun-ws-lwt-unix = buildHttpun-ws {
+      pname = "httpun-ws-lwt-unix";
       src = genSrc {
         dirs = [ "lwt-unix" ];
-        files = [ "websocketaf-lwt-unix.opam" ];
+        files = [ "httpun-ws-lwt-unix.opam" ];
       };
       doCheck = false;
       propagatedBuildInputs = [
-        websocketaf
-        websocketaf-lwt
+        httpun-ws
+        httpun-ws-lwt
         faraday-lwt-unix
         gluten-lwt-unix
       ];
     };
 
-    websocketaf-async = buildWebsocketaf {
-      pname = "websocketaf-async";
+    httpun-ws-async = buildHttpun-ws {
+      pname = "httpun-ws-async";
       src = genSrc {
         dirs = [ "async" ];
-        files = [ "websocketaf-async.opam" ];
+        files = [ "httpun-ws-async.opam" ];
       };
       doCheck = false;
       propagatedBuildInputs = [
-        websocketaf
+        httpun-ws
         async
         digestif
         faraday-async
@@ -73,32 +73,32 @@ let
       ];
     };
 
-    websocketaf-mirage = buildWebsocketaf {
-      pname = "websocketaf-mirage";
+    httpun-ws-mirage = buildHttpun-ws {
+      pname = "httpun-ws-mirage";
       src = genSrc {
         dirs = [ "mirage" ];
-        files = [ "websocketaf-mirage.opam" ];
+        files = [ "httpun-ws-mirage.opam" ];
       };
       doCheck = false;
       propagatedBuildInputs = [
         conduit-mirage
-        websocketaf-lwt
+        httpun-ws-lwt
         gluten-mirage
       ];
     };
   };
 in
-websocketafPackages // (if lib.versionOlder "5.0" ocaml.version then {
-  websocketaf-eio = buildWebsocketaf {
-    pname = "websocketaf-eio";
+httpun-wsPackages // (if lib.versionOlder "5.0" ocaml.version then {
+  httpun-ws-eio = buildHttpun-ws {
+    pname = "httpun-ws-eio";
     src = genSrc {
       dirs = [ "eio" ];
-      files = [ "websocketaf-eio.opam" ];
+      files = [ "httpun-ws-eio.opam" ];
     };
 
     propagatedBuildInputs = [
       gluten-eio
-      websocketafPackages.websocketaf
+      httpun-wsPackages.httpun-ws
       digestif
     ];
   };
