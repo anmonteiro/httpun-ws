@@ -8,7 +8,10 @@ in
   inputsFrom = lib.attrValues httpun-wsDrvs;
   buildInputs = with pkgs.ocamlPackages; [
     merlin
-    pkgs.ocamlformat
+    ocamlformat
+    httpun-lwt-unix
+    httpun-async
+    httpun-eio
   ];
 }).overrideAttrs (o: {
   propagatedBuildInputs = lib.filter

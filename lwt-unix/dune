@@ -1,6 +1,4 @@
 (library
  (name httpun_ws_lwt_unix)
  (public_name httpun-ws-lwt-unix)
- (libraries gluten-lwt-unix faraday-lwt-unix httpun-ws-lwt lwt.unix)
- (flags
-  (:standard -safe-string)))
+ (libraries gluten-lwt-unix httpun-ws-lwt lwt.unix))

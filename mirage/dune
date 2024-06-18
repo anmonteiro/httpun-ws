@@ -1,13 +1,4 @@
 (library
  (name httpun_ws_mirage)
  (public_name httpun-ws-mirage)
- (libraries
-  faraday-lwt
-  httpun-ws
-  gluten-mirage
-  httpun-ws-lwt
-  lwt
-  mirage-flow
-  cstruct)
- (flags
-  (:standard -safe-string)))
+ (libraries httpun-ws gluten-mirage httpun-ws-lwt lwt mirage-flow cstruct))
