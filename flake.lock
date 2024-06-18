@@ -41,17 +41,17 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1718685333,
+        "lastModified": 1718687712,
         "narHash": "sha256-siTiiFUgEq4xclUM+/wg14gsUnc2x7d8lJuE2CuYbKE=",
-        "ref": "refs/heads/anmonteiro/httpun",
-        "rev": "f59da5e051cc753534b0329f4f8bd87f21a3972a",
-        "revCount": 1770,
-        "type": "git",
-        "url": "file:///Users/anmonteiro/monorepo/nix-overlays"
+        "owner": "anmonteiro",
+        "repo": "nix-overlays",
+        "rev": "f89fbc7d17156f3aa8b1e1b1d42ff7397d112674",
+        "type": "github"
       },
       "original": {
-        "type": "git",
-        "url": "file:///Users/anmonteiro/monorepo/nix-overlays"
+        "owner": "anmonteiro",
+        "repo": "nix-overlays",
+        "type": "github"
       }
     },
     "nixpkgs_2": {

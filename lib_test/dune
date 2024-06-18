@@ -1,3 +1,4 @@
 (test
+ (package httpun-ws)
  (libraries httpun-ws alcotest)
  (name test_httpun_ws))
