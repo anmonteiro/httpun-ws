@@ -1,4 +1,10 @@
-{ packages, pkgs, stdenv, lib, mkShell }:
+{ packages
+, pkgs
+, stdenv
+, lib
+, mkShell
+, release-mode ? false
+}:
 
 let
   httpun-wsDrvs = lib.filterAttrs (_: value: lib.isDerivation value) packages;
@@ -6,7 +12,13 @@ let
 in
 (mkShell {
   inputsFrom = lib.attrValues httpun-wsDrvs;
-  buildInputs = with pkgs.ocamlPackages; [
+  buildInputs = with pkgs.ocamlPackages; (if release-mode then
+    (with pkgs; [
+      cacert
+      curl
+      dune-release
+      git
+    ]) else [ ]) ++ [
     merlin
     ocamlformat
     httpun-lwt-unix
