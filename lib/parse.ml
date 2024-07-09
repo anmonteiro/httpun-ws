@@ -63,10 +63,10 @@ let payload_offset_of_bits bits =
   let initial_offset = 2 in
   let mask_offset    = (bits land (1 lsl 7)) lsr (7 - 2) in
   let length_offset  =
-    let length = bits land 0b01111111 in
-    if length < 126
-    then 0
-    else 2 lsl ((length land 0b1) lsl 2)
+    match bits land 0b01111111 with
+    | 127 -> 8
+    | 126 -> 2
+    | _   -> 0
   in
   initial_offset + mask_offset + length_offset
 ;;
