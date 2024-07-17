@@ -72,10 +72,10 @@ let send_bytes t ?(is_fin=true) ~kind payload ~off ~len =
   wakeup t
 
 let send_ping ?application_data t =
+  let mask = mask t in
   begin match application_data with
-  | None -> Serialize.serialize_control t.faraday ~opcode:`Ping
+  | None -> Serialize.serialize_control ?mask t.faraday ~opcode:`Ping
   | Some { IOVec.buffer; off; len } ->
-    let mask = mask t in
     Serialize.schedule_serialize
       t.faraday
       ?mask
@@ -89,10 +89,10 @@ let send_ping ?application_data t =
   wakeup t
 
 let send_pong ?application_data t =
+  let mask = mask t in
   begin match application_data with
-  | None -> Serialize.serialize_control t.faraday ~opcode:`Pong;
+  | None -> Serialize.serialize_control ?mask t.faraday ~opcode:`Pong;
   | Some { IOVec.buffer; off; len } ->
-    let mask = mask t in
     Serialize.schedule_serialize
       t.faraday
       ?mask
