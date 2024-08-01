@@ -35,18 +35,15 @@ module Websocket = struct
 
     let test_parsing_ping_frame () =
       let frame = parse_frame "\137\128\000\000\046\216" in
-      Alcotest.check Testable.opcode "opcode" `Ping (Parse.opcode frame);
-      Alcotest.(check bool) "has mask" true (Parse.has_mask frame);
-      Alcotest.(check int32) "mask" 11992l (Parse.mask_exn frame);
-      Alcotest.(check int) "payload_length" (Parse.payload_length frame) 0;
-      Alcotest.(check int) "length" (Parse.length frame) 6
+      Alcotest.check Testable.opcode "opcode" `Ping frame.opcode;
+      Alcotest.(check (option int32)) "mask" (Some 11992l) frame.mask;
+      Alcotest.(check int) "payload_length" 0 frame.payload_length
 
     let test_parsing_close_frame () =
       let frame = parse_frame "\136\000" in
-      Alcotest.check Testable.opcode "opcode" `Connection_close (Parse.opcode frame);
-      Alcotest.(check int) "payload_length" (Parse.payload_length frame) 0;
-      Alcotest.(check int) "length" (Parse.length frame) 2;
-      Alcotest.(check bool) "is_fin" true (Parse.is_fin frame)
+      Alcotest.check Testable.opcode "opcode" `Connection_close frame.opcode;
+      Alcotest.(check int) "payload_length" 0 frame.payload_length;
+      Alcotest.(check bool) "is_fin" true frame.is_fin
 
     let read_payload frame =
       let rev_payload_chunks = ref [] in
@@ -60,23 +57,21 @@ module Websocket = struct
 
     let test_parsing_text_frame () =
       let frame = parse_frame "\129\139\086\057\046\216\103\011\029\236\099\015\025\224\111\009\036" in
-      Alcotest.check Testable.opcode "opcode" `Text (Parse.opcode frame);
-      Alcotest.(check bool) "has mask" true (Parse.has_mask frame);
-      Alcotest.(check int32) "mask" 1446588120l (Parse.mask_exn frame);
-      Alcotest.(check int) "payload_length" (Parse.payload_length frame) 11;
-      Alcotest.(check int) "length" (Parse.length frame) 17;
+      Alcotest.check Testable.opcode "opcode" `Text frame.opcode;
+      Alcotest.(check (option int32)) "mask" (Some 1446588120l) frame.mask;
+      Alcotest.(check int) "payload_length" 11 frame.payload_length;
       let rev_payload_chunks = read_payload frame in
-      Alcotest.(check bool) "is_fin" true (Parse.is_fin frame);
+      Alcotest.(check bool) "is_fin" true frame.is_fin;
       Alcotest.(check (list string)) "payload" ["1234567890\n"] rev_payload_chunks
 
 
     let test_parsing_fin_bit () =
      let frame = parse_frame (serialize_frame ~is_fin:false "hello") in
-      Alcotest.check Testable.opcode "opcode" `Text (Parse.opcode frame);
-      Alcotest.(check bool) "is_fin" false (Parse.is_fin frame);
+      Alcotest.check Testable.opcode "opcode" `Text frame.opcode;
+      Alcotest.(check bool) "is_fin" false frame.is_fin;
      let frame = parse_frame (serialize_frame ~is_fin:true "hello") in
-      Alcotest.check Testable.opcode "opcode" `Text (Parse.opcode frame);
-      Alcotest.(check bool) "is_fin" true (Parse.is_fin frame);
+      Alcotest.check Testable.opcode "opcode" `Text frame.opcode;
+      Alcotest.(check bool) "is_fin" true frame.is_fin;
       let rev_payload_chunks = read_payload frame in
       Alcotest.(check (list string)) "payload" ["hello"] rev_payload_chunks
 

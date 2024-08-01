@@ -129,27 +129,20 @@ let payload_parser t =
   >>= fun () -> finish t.payload
 ;;
 
-let frame =
+let frame ~buf =
   let open Angstrom in
-  let frame ~buf =
-    parse_headers
-    >>| fun headers ->
-      let payload_length = payload_length_of_headers headers
-      and is_fin = is_fin headers
-      and opcode = opcode headers
-      and mask = mask headers in
-      let payload = match payload_length with
-      | 0 -> Payload.empty
-      | _ -> Payload.create buf
-      in
-      { is_fin; opcode; mask; payload_length; payload }
-  in
-  fun ~buf handler ->
-    frame ~buf <* commit >>= fun frame ->
-    let { is_fin; opcode; payload_length = len; _ } = frame in
-    handler ~opcode ~is_fin ~len frame.payload;
-    payload_parser frame
-  ;;
+  parse_headers
+  >>| fun headers ->
+    let payload_length = payload_length_of_headers headers
+    and is_fin = is_fin headers
+    and opcode = opcode headers
+    and mask = mask headers in
+    let payload = match payload_length with
+    | 0 -> Payload.empty
+    | _ -> Payload.create buf
+    in
+    { is_fin; opcode; mask; payload_length; payload }
+;;
 
 module Reader = struct
   module AU = Angstrom.Unbuffered
@@ -168,7 +161,12 @@ module Reader = struct
     let parser =
       let open Angstrom in
       let buf = Bigstringaf.create 0x1000 in
-      skip_many (frame ~buf frame_handler)
+      skip_many
+        (frame ~buf <* commit >>= fun frame ->
+          let payload = frame.payload in
+          let { is_fin; opcode; payload_length = len; _ } = frame in
+          frame_handler ~opcode ~is_fin ~len payload;
+          payload_parser frame)
     in
     { parser
     ; parse_state = Done
