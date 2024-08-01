@@ -169,7 +169,6 @@ module Frame = struct
     in
     for i = off to off + len - 1 do
       let j = (i + src_off - off) mod 4 in
-      (* let j = (i - off) mod 4 in *)
       let c = Bigstringaf.unsafe_get bs i |> Char.code in
       let c = c lxor Int32.(logand (shift_right mask (8 * (3 - j))) 0xffl |> to_int) in
       Bigstringaf.unsafe_set bs i (Char.unsafe_chr c)
