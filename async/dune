@@ -1,4 +1,4 @@
 (library
  (name httpun_ws_async)
  (public_name httpun-ws-async)
- (libraries async core gluten-async httpun-ws digestif.ocaml))
+ (libraries async core gluten-async httpun-ws digestif))
