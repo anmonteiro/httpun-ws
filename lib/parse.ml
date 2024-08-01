@@ -1,62 +1,67 @@
 type t =
-{ headers: Bigstringaf.t
-; payload: Payload.t
+{ payload_length: int
+ ; is_fin: bool
+ ; mask: int32 option
+ ; payload: Payload.t
+ ; opcode: Websocket.Opcode.t
 }
 
-let is_fin t =
-  let bits = Bigstringaf.unsafe_get t.headers 0 |> Char.code in
+let is_fin headers =
+  let bits = Bigstringaf.unsafe_get headers 0 |> Char.code in
   bits land (1 lsl 7) = 1 lsl 7
 ;;
 
-let rsv t =
+(* let rsv t =
   let bits = Bigstringaf.unsafe_get t.headers 0 |> Char.code in
   (bits lsr 4) land 0b0111
 ;;
+ *)
 
-let opcode t =
-  let bits = Bigstringaf.unsafe_get t.headers 0 |> Char.code in
+let opcode headers =
+  let bits = Bigstringaf.unsafe_get headers 0 |> Char.code in
   bits land 0b1111 |> Websocket.Opcode.unsafe_of_code
 ;;
 
 let payload_length_of_headers headers =
   let bits = Bigstringaf.unsafe_get headers 1 |> Char.code in
   let length = bits land 0b01111111 in
-  if length = 126 then Bigstringaf.unsafe_get_int16_be headers 2                 else
-  (* This is technically unsafe, but if somebody's asking us to read 2^63
-   * bytes, then we're already screwed. *)
-  if length = 127 then Bigstringaf.unsafe_get_int64_be headers 2 |> Int64.to_int else
-  length
+  if length <= 125 then
+    (* From RFC6455§5.3:
+     *   The length of the "Payload data", in bytes: if 0-125, that is the
+     *   payload length. *)
+    length
+   else if length = 126 then
+     (* From RFC6455§5.3:
+      * If 126, the following 2 bytes interpreted as a 16-bit unsigned integer
+      * are the payload length. *)
+     Bigstringaf.unsafe_get_int16_be headers 2
+   else begin
+     assert (length = 127);
+    (* This is technically unsafe, but if somebody's asking us to read 2^63
+     * bytes, then we're already screwed. *)
+    Bigstringaf.unsafe_get_int64_be headers 2 |> Int64.to_int
+   end
 ;;
 
-let payload_length t = payload_length_of_headers t.headers
+(* let payload_length t = payload_length_of_headers t.headers *)
 
-let has_mask t =
-  let bits = Bigstringaf.unsafe_get t.headers 1 |> Char.code in
-  bits land (1 lsl 7) = 1 lsl 7
-;;
-
-let mask t =
-  if not (has_mask t)
+let mask =
+  let has_mask headers =
+    let bits = Bigstringaf.unsafe_get headers 1 |> Char.code in
+    (bits land 0b1000_0000) = 0b1000_0000
+  in
+  let mask_exn headers =
+    let bits = Bigstringaf.unsafe_get headers 1 |> Char.code in
+    if bits  = 254 then Bigstringaf.unsafe_get_int32_be headers 4  else
+    if bits  = 255 then Bigstringaf.unsafe_get_int32_be headers 10 else
+    if bits >= 127 then Bigstringaf.unsafe_get_int32_be headers 2  else
+    failwith "Frame.mask_exn: no mask present"
+  in
+  fun headers ->
+  if not (has_mask headers)
   then None
   else
-    Some (
-      let bits = Bigstringaf.unsafe_get t.headers 1 |> Char.code in
-      if bits  = 254 then Bigstringaf.unsafe_get_int32_be t.headers 4  else
-      if bits  = 255 then Bigstringaf.unsafe_get_int32_be t.headers 10 else
-      Bigstringaf.unsafe_get_int32_be t.headers 2)
-;;
-
-let mask_exn t =
-  let bits = Bigstringaf.unsafe_get t.headers 1 |> Char.code in
-  if bits  = 254 then Bigstringaf.unsafe_get_int32_be t.headers 4  else
-  if bits  = 255 then Bigstringaf.unsafe_get_int32_be t.headers 10 else
-  if bits >= 127 then Bigstringaf.unsafe_get_int32_be t.headers 2  else
-  failwith "Frame.mask_exn: no mask present"
-;;
-
-let length t =
-  let payload_length = payload_length t in
-  Bigstringaf.length t.headers + payload_length
+    Some (mask_exn headers)
 ;;
 
 let payload_offset_of_bits bits =
@@ -85,25 +90,23 @@ let parse_headers =
 let payload_parser t =
   let open Angstrom in
   let unmask t bs ~src_off =
-    match mask t with
+    match t.mask with
     | None -> bs
     | Some mask ->
       Websocket.Frame.apply_mask mask bs ~src_off;
       bs
   in
   let finish payload =
-    let open Angstrom in
     Payload.close payload;
     commit
   in
   let schedule_size ~src_off payload n =
-    let open Angstrom in
     begin if Payload.is_closed payload
     then advance n
     else take_bigstring n >>| fun bs ->
       let faraday = Payload.unsafe_faraday payload in
       Faraday.schedule_bigstring faraday (unmask ~src_off t bs)
-    end *> commit
+    end <* commit
   in
   let read_exact =
     let rec read_exact src_off n =
@@ -117,11 +120,12 @@ let payload_parser t =
             available >>= fun m ->
             let m' = (min m n) in
             let n' = n - m' in
-            schedule_size ~src_off t.payload m' >>= fun () -> read_exact (src_off + m') n'
+            schedule_size ~src_off t.payload m'
+            >>= fun () -> read_exact (src_off + m') n'
     in
     fun n -> read_exact 0 n
   in
-  read_exact (payload_length t)
+  read_exact t.payload_length
   >>= fun () -> finish t.payload
 ;;
 
@@ -129,12 +133,15 @@ let frame ~buf =
   let open Angstrom in
   parse_headers
   >>| fun headers ->
-    let len = payload_length_of_headers headers in
-    let payload = match len with
+    let payload_length = payload_length_of_headers headers
+    and is_fin = is_fin headers
+    and opcode = opcode headers
+    and mask = mask headers in
+    let payload = match payload_length with
     | 0 -> Payload.empty
     | _ -> Payload.create buf
     in
-    { headers; payload }
+    { is_fin; opcode; mask; payload_length; payload }
 ;;
 
 module Reader = struct
@@ -157,9 +164,7 @@ module Reader = struct
       skip_many
         (frame ~buf <* commit >>= fun frame ->
           let payload = frame.payload in
-          let is_fin = is_fin frame in
-          let opcode = opcode frame in
-          let len = payload_length frame in
+          let { is_fin; opcode; payload_length = len; _ } = frame in
           frame_handler ~opcode ~is_fin ~len payload;
           payload_parser frame)
     in
