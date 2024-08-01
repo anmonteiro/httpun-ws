@@ -98,7 +98,9 @@ module Wsd : sig
     -> len:int
     -> unit
   (** [is_fin] defaults to [true]. Set to `false` if sending multiple frames,
-      except on the last one. *)
+      except on the last one.
+      {b NOTE}: this function mutates the bigarray on clients due to the
+      WebSocket protocol masking requirements. *)
 
   val send_bytes
     :  t
@@ -109,7 +111,9 @@ module Wsd : sig
     -> len:int
     -> unit
   (** [is_fin] defaults to [true]. Set to `false` if sending multiple frames,
-      except on the last one. *)
+      except on the last one.
+      {b NOTE}: this function mutates the `bytes` argument on clients due to
+      the WebSocket protocol masking requirements. *)
 
   val send_ping : ?application_data:Bigstringaf.t IOVec.t -> t -> unit
   val send_pong : ?application_data:Bigstringaf.t IOVec.t -> t -> unit
