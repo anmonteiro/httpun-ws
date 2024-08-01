@@ -1,4 +1,4 @@
 (library
  (name httpun_ws_eio)
  (public_name httpun-ws-eio)
- (libraries httpun-ws gluten-eio eio digestif.ocaml base64))
+ (libraries httpun-ws gluten-eio eio digestif base64))

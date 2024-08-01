@@ -1,4 +1,4 @@
 (library
  (name httpun_ws_lwt)
  (public_name httpun-ws-lwt)
- (libraries httpun-ws gluten-lwt lwt digestif.ocaml))
+ (libraries httpun-ws gluten-lwt lwt digestif))
