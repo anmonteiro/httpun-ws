@@ -25,6 +25,7 @@ module Websocket = struct
       let f = Faraday.create 0x100 in
       Serialize.serialize_bytes
         f
+        ~mode:`Server
         ~is_fin
         ~opcode:`Text
         ~payload:(Bytes.of_string frame)

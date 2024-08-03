@@ -2,10 +2,7 @@ module IOVec = Httpun.IOVec
 
 type error = [ `Exn of exn ]
 
-type mode =
-  [ `Client of unit -> int32
-  | `Server
-  ]
+type mode = Serialize.mode
 
 type t =
   { faraday : Faraday.t
@@ -26,11 +23,6 @@ let create ~error_handler mode =
   ; error_code = `Ok
   }
 
-let mask t =
-  match t.mode with
-  | `Client m -> Some (m ())
-  | `Server -> None
-
 let is_closed t =
   Faraday.is_closed t.faraday
 
@@ -47,11 +39,10 @@ let wakeup t =
   Optional_thunk.call_if_some f
 
 let schedule t ?(is_fin=true) ~kind payload ~off ~len =
-  let mask = mask t in
   Serialize.schedule_serialize
     t.faraday
     (* TODO: is_fin *)
-    ?mask
+    ~mode:t.mode
     ~is_fin
     ~opcode:(kind :> Websocket.Opcode.t)
     ~src_off:0
@@ -59,10 +50,9 @@ let schedule t ?(is_fin=true) ~kind payload ~off ~len =
   wakeup t
 
 let send_bytes t ?(is_fin=true) ~kind payload ~off ~len =
-  let mask = mask t in
   Serialize.serialize_bytes
     t.faraday
-    ?mask
+    ~mode:t.mode
     ~is_fin
     ~opcode:(kind :> Websocket.Opcode.t)
     ~payload
@@ -73,12 +63,11 @@ let send_bytes t ?(is_fin=true) ~kind payload ~off ~len =
 
 let send_ping ?application_data t =
   begin match application_data with
-  | None -> Serialize.serialize_control t.faraday ~opcode:`Ping
+  | None -> Serialize.serialize_control ~mode:t.mode t.faraday ~opcode:`Ping
   | Some { IOVec.buffer; off; len } ->
-    let mask = mask t in
     Serialize.schedule_serialize
       t.faraday
-      ?mask
+      ~mode:t.mode
       ~is_fin:true
       ~opcode:`Ping
       ~src_off:0
@@ -90,12 +79,11 @@ let send_ping ?application_data t =
 
 let send_pong ?application_data t =
   begin match application_data with
-  | None -> Serialize.serialize_control t.faraday ~opcode:`Pong;
+  | None -> Serialize.serialize_control ~mode:t.mode t.faraday ~opcode:`Pong;
   | Some { IOVec.buffer; off; len } ->
-    let mask = mask t in
     Serialize.schedule_serialize
       t.faraday
-      ?mask
+      ~mode:t.mode
       ~is_fin:true
       ~opcode:`Pong
       ~src_off:0
@@ -110,11 +98,10 @@ let flushed t f = Faraday.flush t.faraday f
 let close ?code t =
   begin match code with
   | Some code ->
-    let mask = mask t in
     let payload = Bytes.create 2 in
     Bytes.set_uint16_be payload 0 (Websocket.Close_code.to_int code);
     Serialize.serialize_bytes t.faraday
-      ?mask
+      ~mode:t.mode
       ~is_fin:true
       ~opcode:`Connection_close
       ~src_off:0
