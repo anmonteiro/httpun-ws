@@ -38,34 +38,43 @@ module IOVec = Httpun.IOVec
   { faraday : Faraday.t
   ; mutable read_scheduled : bool
   ; mutable on_eof : unit -> unit
+  ; mutable eof_has_been_called : bool
   ; mutable on_read : Bigstringaf.t -> off:int -> len:int -> unit
+  ; when_ready_to_read             : Optional_thunk.t
+  ; on_payload_eof : unit -> unit
   }
 
   let default_on_eof         = Sys.opaque_identity (fun () -> ())
   let default_on_read        = Sys.opaque_identity (fun _ ~off:_ ~len:_ -> ())
 
-  let of_faraday faraday =
-    { faraday
+  let create buffer ~when_ready_to_read ~on_payload_eof =
+    { faraday = Faraday.of_bigstring buffer
     ; read_scheduled         = false
+    ; eof_has_been_called    = false
     ; on_eof                 = default_on_eof
     ; on_read                = default_on_read
+    ; when_ready_to_read
+    ; on_payload_eof
     }
 
-  let create buffer =
-    of_faraday (Faraday.of_bigstring buffer)
-
-  let create_empty () =
-    let t = create Bigstringaf.empty in
+  let create_empty ~on_payload_eof =
+    let t =
+      create
+        Bigstringaf.empty
+        ~when_ready_to_read:Optional_thunk.none
+        ~on_payload_eof
+    in
     Faraday.close t.faraday;
+    t.on_payload_eof ();
     t
-
-  let empty = create_empty ()
 
   let is_closed t =
     Faraday.is_closed t.faraday
 
   let unsafe_faraday t =
     t.faraday
+
+  let ready_to_read t = Optional_thunk.call_if_some t.when_ready_to_read
 
   let rec do_execute_read t on_eof on_read =
     match Faraday.operation t.faraday with
@@ -74,7 +83,12 @@ module IOVec = Httpun.IOVec
       t.read_scheduled <- false;
       t.on_eof         <- default_on_eof;
       t.on_read        <- default_on_read;
-      on_eof ()
+      if not t.eof_has_been_called then begin
+        t.eof_has_been_called <- true;
+        t.on_payload_eof ();
+        on_eof ();
+      end
+    (* [Faraday.operation] never returns an empty list of iovecs *)
     | `Writev []       -> assert false
     | `Writev (iovec::_) ->
       t.read_scheduled <- false;
@@ -96,10 +110,15 @@ module IOVec = Httpun.IOVec
       t.on_eof         <- on_eof;
       t.on_read        <- on_read;
     end;
-    do_execute_read t on_eof on_read
-
-  let is_read_scheduled t = t.read_scheduled
+    do_execute_read t on_eof on_read;
+    ready_to_read t
 
   let close t =
     Faraday.close t.faraday;
-    execute_read t
+    execute_read t;
+    ready_to_read t
+  ;;
+
+  let has_pending_output t = Faraday.has_pending_output t.faraday
+
+  let is_read_scheduled t = t.read_scheduled
