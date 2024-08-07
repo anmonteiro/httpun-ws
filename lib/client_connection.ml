@@ -121,7 +121,7 @@ let next_read_operation t =
         (* TODO(anmonteiro): handle this *)
         assert false
         (* set_error_and_handle t (`Exn (Failure message)); `Close *)
-    | (`Read | `Close) as operation -> operation
+    | (`Read | `Yield | `Close) as operation -> operation
 
 let read t bs ~off ~len =
   match t.state with
@@ -152,7 +152,7 @@ let report_exn t exn =
 let yield_reader t f =
   match t.state with
   | Handshake handshake -> Client_handshake.yield_reader handshake f
-  | Websocket _websocket -> assert false
+  | Websocket websocket -> Websocket_connection.yield_reader websocket f
 
 let yield_writer t f =
   match t.state with

@@ -103,7 +103,7 @@ let read_eof t bs ~off ~len =
 let yield_reader t f =
   match t.state with
   | Handshake handshake -> Server_handshake.yield_reader handshake f
-  | Websocket _ -> assert false
+  | Websocket websocket -> Websocket_connection.yield_reader websocket f
 
 let next_write_operation t =
   match t.state with

@@ -5,10 +5,14 @@ type error = [ `Exn of exn ]
 
 type error_handler = Wsd.t -> error -> unit
 
+let default_payload =
+  Sys.opaque_identity (Payload.create_empty ~on_payload_eof:(fun () -> ()))
+
 type t =
   { reader : [`Parse of string list * string] Reader.t
   ; wsd    : Wsd.t
   ; eof : unit -> unit
+  ; mutable current_payload: Payload.t
   }
 
 type input_handlers =
@@ -34,13 +38,33 @@ let default_error_handler wsd (`Exn exn) =
   Wsd.close wsd
 ;;
 
+let wakeup_reader t = Reader.wakeup t.reader
+
 let create ~mode ?(error_handler = default_error_handler) websocket_handler =
   let wsd = Wsd.create ~error_handler mode in
   let { frame; eof } = websocket_handler wsd in
-  { reader = Reader.create frame
-  ; wsd
-  ; eof
-  }
+  let handler t = fun ~opcode ~is_fin ~len payload ->
+    let t = Lazy.force t in
+    t.current_payload <- payload;
+    frame ~opcode ~is_fin ~len payload
+  in
+  let rec reader =
+    lazy (
+      Reader.create
+        (fun ~opcode ~is_fin ~len payload -> (handler t ~opcode ~is_fin ~len payload))
+        ~on_payload_eof:(fun () ->
+          let t = Lazy.force t in
+          t.current_payload <- default_payload;
+        )
+    )
+  and t = lazy
+    { reader = Lazy.force reader
+    ; wsd
+    ; eof
+    ; current_payload = default_payload
+    }
+  in
+  Lazy.force t
 
 let shutdown { wsd; _ } =
   Wsd.close wsd
@@ -53,7 +77,17 @@ let next_read_operation t =
   match Reader.next t.reader with
   | `Error (`Parse (_, message)) ->
     set_error_and_handle t (`Exn (Failure message)); `Close
-  | (`Read | `Close) as operation -> operation
+  | `Read ->
+    begin match t.current_payload == default_payload with
+    | true -> `Read
+    | false ->
+      if Payload.is_read_scheduled t.current_payload
+      then `Read
+      else begin
+        `Yield
+      end
+    end
+  | `Close -> `Close
 
 let next_write_operation t =
   Wsd.next t.wsd
@@ -83,4 +117,7 @@ let is_closed { wsd; _ } =
 let report_exn t exn =
   set_error_and_handle t (`Exn exn)
 
-let yield_reader _t _f = ()
+let yield_reader t k =
+  if Reader.is_closed t.reader
+  then k ()
+  else Reader.on_wakeup t.reader k
