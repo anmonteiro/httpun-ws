@@ -41,31 +41,27 @@ module IOVec = Httpun.IOVec
   ; mutable eof_has_been_called : bool
   ; mutable on_read : Bigstringaf.t -> off:int -> len:int -> unit
   ; when_ready_to_read             : Optional_thunk.t
-  ; on_payload_eof : unit -> unit
   }
 
   let default_on_eof         = Sys.opaque_identity (fun () -> ())
   let default_on_read        = Sys.opaque_identity (fun _ ~off:_ ~len:_ -> ())
 
-  let create buffer ~when_ready_to_read ~on_payload_eof =
+  let create buffer ~when_ready_to_read =
     { faraday = Faraday.of_bigstring buffer
     ; read_scheduled         = false
     ; eof_has_been_called    = false
     ; on_eof                 = default_on_eof
     ; on_read                = default_on_read
     ; when_ready_to_read
-    ; on_payload_eof
     }
 
-  let create_empty ~on_payload_eof =
+  let create_empty () =
     let t =
       create
         Bigstringaf.empty
         ~when_ready_to_read:Optional_thunk.none
-        ~on_payload_eof
     in
     Faraday.close t.faraday;
-    t.on_payload_eof ();
     t
 
   let is_closed t =
@@ -85,7 +81,6 @@ module IOVec = Httpun.IOVec
       t.on_read        <- default_on_read;
       if not t.eof_has_been_called then begin
         t.eof_has_been_called <- true;
-        t.on_payload_eof ();
         on_eof ();
       end
     (* [Faraday.operation] never returns an empty list of iovecs *)
@@ -122,3 +117,15 @@ module IOVec = Httpun.IOVec
   let has_pending_output t = Faraday.has_pending_output t.faraday
 
   let is_read_scheduled t = t.read_scheduled
+
+type input_state =
+ | Ready
+ | Wait
+ | Complete
+
+let input_state t : input_state =
+  if is_closed t
+  then Complete
+  else if is_read_scheduled t
+  then Ready
+  else Wait

@@ -1,9 +1,9 @@
 type t =
-{ payload_length: int
- ; is_fin: bool
- ; mask: int32 option
- ; opcode: Websocket.Opcode.t
-}
+  { payload_length: int
+  ; is_fin: bool
+  ; mask: int32 option
+  ; opcode: Websocket.Opcode.t
+  }
 
 let is_fin headers =
   let bits = Bigstringaf.unsafe_get headers 0 |> Char.code in
@@ -159,23 +159,22 @@ module Reader = struct
     t.wakeup <- Optional_thunk.none;
     Optional_thunk.call_if_some f
 
-  let create frame_handler ~on_payload_eof =
+  let create frame_handler =
     let rec parser t =
       let open Angstrom in
       let buf = Bigstringaf.create 0x1000 in
       skip_many
         (frame <* commit >>= fun frame ->
-          let { is_fin; opcode; payload_length; _ } = frame in
+          let { payload_length; _ } = frame in
           let payload =
             match payload_length with
-            | 0 -> Payload.create_empty ~on_payload_eof
+            | 0 -> Payload.create_empty ()
             | _ ->
               Payload.create buf
                 ~when_ready_to_read:(Optional_thunk.some (fun () ->
                   wakeup (Lazy.force t)))
-                ~on_payload_eof
           in
-          frame_handler ~opcode ~is_fin ~len:payload_length payload;
+          frame_handler frame payload;
           payload_parser frame payload)
     and t = lazy (
       { parser = parser t
@@ -235,12 +234,15 @@ module Reader = struct
     end;
     consumed
 
+  let force_close t =
+    t.closed <- true;
+  ;;
+
   let next t =
     match t.parse_state with
-    | Done ->
-      if t.closed
-      then `Close
-      else `Read
     | Fail failure -> `Error failure
+    | _ when t.closed -> `Close
+    | Done      -> `Read
     | Partial _ -> `Read
+  ;;
 end

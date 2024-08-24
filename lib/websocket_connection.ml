@@ -5,19 +5,24 @@ type error = [ `Exn of exn ]
 
 type error_handler = Wsd.t -> error -> unit
 
-let default_payload =
-  Sys.opaque_identity (Payload.create_empty ~on_payload_eof:(fun () -> ()))
+type frame_handler =
+    opcode:Websocket.Opcode.t
+    -> is_fin:bool
+    -> len:int
+    -> Payload.t
+    -> unit
 
 type t =
   { reader : [`Parse of string list * string] Reader.t
   ; wsd    : Wsd.t
+  ; frame_handler : frame_handler
   ; eof : unit -> unit
-  ; mutable current_payload: Payload.t
+  ; frame_queue: (Parse.t * Payload.t) Queue.t
   }
 
 type input_handlers =
-  { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> len:int -> Payload.t -> unit
-  ; eof   : unit -> unit }
+  { frame : frame_handler
+  ; eof : unit -> unit }
 
 (* TODO: this should be passed as an argument from the runtime, to allow for
  * cryptographically secure random number generation. *)
@@ -42,52 +47,95 @@ let wakeup_reader t = Reader.wakeup t.reader
 
 let create ~mode ?(error_handler = default_error_handler) websocket_handler =
   let wsd = Wsd.create ~error_handler mode in
-  let { frame; eof } = websocket_handler wsd in
-  let handler t = fun ~opcode ~is_fin ~len payload ->
-    let t = Lazy.force t in
-    t.current_payload <- payload;
-    frame ~opcode ~is_fin ~len payload
+  let { frame = frame_handler; eof } = websocket_handler wsd in
+  let frame_queue = Queue.create () in
+  let handler frame payload =
+    let call_handler = Queue.is_empty frame_queue in
+
+    Queue.push (frame, payload) frame_queue;
+    if call_handler
+    then
+      let { Parse.opcode; is_fin; payload_length; _ } = frame in
+      frame_handler ~opcode ~is_fin ~len:payload_length payload
   in
-  let rec reader =
-    lazy (
-      Reader.create
-        (fun ~opcode ~is_fin ~len payload -> (handler t ~opcode ~is_fin ~len payload))
-        ~on_payload_eof:(fun () ->
-          let t = Lazy.force t in
-          t.current_payload <- default_payload;
-        )
-    )
+  let rec reader = lazy (Reader.create handler)
   and t = lazy
     { reader = Lazy.force reader
     ; wsd
+    ; frame_handler
     ; eof
-    ; current_payload = default_payload
+    ; frame_queue
     }
   in
   Lazy.force t
 
-let shutdown { wsd; _ } =
-  Wsd.close wsd
+let shutdown_reader t =
+  Reader.force_close t.reader;
+  wakeup_reader t
+
+let shutdown t =
+  shutdown_reader t;
+  Wsd.close t.wsd
 
 let set_error_and_handle t error =
   Wsd.report_error t.wsd error;
   shutdown t
 
-let next_read_operation t =
-  match Reader.next t.reader with
-  | `Error (`Parse (_, message)) ->
-    set_error_and_handle t (`Exn (Failure message)); `Close
-  | `Read ->
-    begin match t.current_payload == default_payload with
-    | true -> `Read
-    | false ->
-      if Payload.is_read_scheduled t.current_payload
-      then `Read
-      else begin
-        `Yield
+let advance_frame_queue t =
+  ignore (Queue.take t.frame_queue);
+  if not (Queue.is_empty t.frame_queue)
+  then
+    let { Parse.opcode; is_fin; payload_length; _ }, payload = Queue.peek t.frame_queue in
+    t.frame_handler ~opcode ~is_fin ~len:payload_length payload
+;;
+
+let rec _next_read_operation t =
+  begin match Queue.peek t.frame_queue with
+  | _, payload ->
+    begin match Payload.input_state payload with
+    | Wait ->
+      begin match Reader.next t.reader with
+      | (`Error _ | `Close) as operation -> operation
+      | _ -> `Yield
       end
-    end
-  | `Close -> `Close
+    | Ready -> Reader.next t.reader
+    | Complete ->
+      (* Don't advance the request queue if in an error state. *)
+      begin match Reader.next t.reader with
+      | `Error _ as op ->
+        (* we just don't advance the request queue in the case of a parser
+          error. *)
+        op
+      | `Read as op ->
+        (* Keep reading when in a "partial" state (`Read). *)
+        advance_frame_queue t;
+        op
+      | `Close ->
+        advance_frame_queue t;
+        _next_read_operation t
+      end
+    end;
+  | exception Queue.Empty ->
+    let next = Reader.next t.reader in
+    begin match next with
+    | `Error _ ->
+      (* Don't tear down the whole connection if we saw an unrecoverable
+       * parsing error, as we might be in the process of streaming back the
+       * error response body to the client. *)
+      shutdown_reader t
+    | `Close -> ()
+    | _ -> ()
+    end;
+    next
+  end
+
+let next_read_operation t =
+  match _next_read_operation t with
+  | `Error (`Parse (_, message)) ->
+    set_error_and_handle t (`Exn (Failure message));
+    `Close
+  | `Read -> `Read
+  | (`Yield | `Close) as operation -> operation
 
 let next_write_operation t =
   Wsd.next t.wsd
