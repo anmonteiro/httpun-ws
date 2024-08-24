@@ -115,10 +115,11 @@ module Websocket = struct
          match opcode with
          | `Text ->
            incr frames_parsed;
-           Payload.schedule_read payload
-             ~on_eof:ignore
-             ~on_read:(fun bs ~off ~len ->
-             Wsd.schedule wsd bs ~kind:`Text ~off ~len)
+           let rec on_read bs ~off ~len =
+             Wsd.schedule wsd ~kind:`Text bs ~off ~len;
+             Payload.schedule_read payload ~on_eof:ignore ~on_read
+           in
+           Payload.schedule_read payload ~on_eof:ignore ~on_read
          | `Binary
          | `Continuation
          | `Connection_close
@@ -144,6 +145,7 @@ module Websocket = struct
      let len = String.length frames in
      let bs = Bigstringaf.of_string ~off:0 ~len frames in
      let read = Server_connection.read t bs ~off:0 ~len in
+     ignore @@ Server_connection.next_read_operation t;
      Alcotest.(check int) "Reads both frames" len read;
      Alcotest.(check int) "Both frames parsed and handled" 2 !frames_parsed;
     ;;

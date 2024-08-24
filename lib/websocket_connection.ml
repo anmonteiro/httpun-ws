@@ -140,11 +140,26 @@ let next_read_operation t =
 let next_write_operation t =
   Wsd.next t.wsd
 
+let report_exn t exn =
+  set_error_and_handle t (`Exn exn)
+
+let read_with_more t bs ~off ~len more =
+  let consumed = Reader.read_with_more t.reader bs ~off ~len more in
+  if not (Queue.is_empty t.frame_queue)
+  then (
+    let _, payload = Queue.peek t.frame_queue in
+    if Payload.has_pending_output payload
+    then try Payload.execute_read payload
+    with exn -> report_exn t exn
+  );
+  consumed
+;;
+
 let read t bs ~off ~len =
-  Reader.read_with_more t.reader bs ~off ~len Incomplete
+  read_with_more t bs ~off ~len Incomplete
 
 let read_eof t bs ~off ~len =
-  let r = Reader.read_with_more t.reader bs ~off ~len Complete in
+  let r = read_with_more t bs ~off ~len Complete in
   t.eof ();
   r
 
@@ -161,9 +176,6 @@ let yield_writer t k =
 
 let is_closed { wsd; _ } =
   Wsd.is_closed wsd
-
-let report_exn t exn =
-  set_error_and_handle t (`Exn exn)
 
 let yield_reader t k =
   if Reader.is_closed t.reader
