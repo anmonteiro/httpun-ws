@@ -1,10 +1,9 @@
 type t =
-{ payload_length: int
- ; is_fin: bool
- ; mask: int32 option
- ; payload: Payload.t
- ; opcode: Websocket.Opcode.t
-}
+  { payload_length: int
+  ; is_fin: bool
+  ; mask: int32 option
+  ; opcode: Websocket.Opcode.t
+  }
 
 let is_fin headers =
   let bits = Bigstringaf.unsafe_get headers 0 |> Char.code in
@@ -87,7 +86,7 @@ let parse_headers =
   >>= fun headers_len -> Unsafe.take headers_len Bigstringaf.sub
 ;;
 
-let payload_parser t =
+let payload_parser t payload =
   let open Angstrom in
   let unmask t bs ~src_off =
     match t.mask with
@@ -120,16 +119,16 @@ let payload_parser t =
             available >>= fun m ->
             let m' = (min m n) in
             let n' = n - m' in
-            schedule_size ~src_off t.payload m'
+            schedule_size ~src_off payload m'
             >>= fun () -> read_exact (src_off + m') n'
     in
     fun n -> read_exact 0 n
   in
   read_exact t.payload_length
-  >>= fun () -> finish t.payload
+  >>= fun () -> finish payload
 ;;
 
-let frame ~buf =
+let frame  =
   let open Angstrom in
   parse_headers
   >>| fun headers ->
@@ -137,11 +136,7 @@ let frame ~buf =
     and is_fin = is_fin headers
     and opcode = opcode headers
     and mask = mask headers in
-    let payload = match payload_length with
-    | 0 -> Payload.empty
-    | _ -> Payload.create buf
-    in
-    { is_fin; opcode; mask; payload_length; payload }
+    { is_fin; opcode; mask; payload_length }
 ;;
 
 module Reader = struct
@@ -155,24 +150,52 @@ module Reader = struct
   type 'error t =
     { parser : unit Angstrom.t
     ; mutable parse_state : 'error parse_state
-    ; mutable closed      : bool }
+    ; mutable closed      : bool
+    ; mutable wakeup      : Optional_thunk.t
+    }
+
+  let wakeup t =
+    let f = t.wakeup in
+    t.wakeup <- Optional_thunk.none;
+    Optional_thunk.call_if_some f
 
   let create frame_handler =
-    let parser =
+    let rec parser t =
       let open Angstrom in
       let buf = Bigstringaf.create 0x1000 in
       skip_many
-        (frame ~buf <* commit >>= fun frame ->
-          let payload = frame.payload in
-          let { is_fin; opcode; payload_length = len; _ } = frame in
-          frame_handler ~opcode ~is_fin ~len payload;
-          payload_parser frame)
+        (frame <* commit >>= fun frame ->
+          let { payload_length; _ } = frame in
+          let payload =
+            match payload_length with
+            | 0 -> Payload.create_empty ()
+            | _ ->
+              Payload.create buf
+                ~when_ready_to_read:(Optional_thunk.some (fun () ->
+                  wakeup (Lazy.force t)))
+          in
+          frame_handler frame payload;
+          payload_parser frame payload)
+    and t = lazy (
+      { parser = parser t
+      ; parse_state = Done
+      ; closed      = false
+      ; wakeup = Optional_thunk.none
+      }
+    )
     in
-    { parser
-    ; parse_state = Done
-    ; closed      = false
-    }
+    Lazy.force t
   ;;
+
+  let is_closed t =
+    t.closed
+
+  let on_wakeup t k =
+    if is_closed t
+    then failwith "on_wakeup on closed reader"
+    else if Optional_thunk.is_some t.wakeup
+    then failwith "on_wakeup: only one callback can be registered at a time"
+    else t.wakeup <- Optional_thunk.some k
 
   let transition t state =
     match state with
@@ -195,28 +218,48 @@ module Reader = struct
         t.parse_state <- Partial continue
       | _ -> assert false
 
-  let rec read_with_more t bs ~off ~len more =
+  let rec _read_with_more t bs ~off ~len more =
+    let initial = match t.parse_state with Done -> true | _ -> false in
     let consumed =
       match t.parse_state with
       | Fail _ -> 0
+      (* Don't feed empty input when we're at a request boundary *)
+      | Done when len = 0 -> 0
       | Done   ->
         start t (AU.parse t.parser);
-        read_with_more  t bs ~off ~len more;
+        _read_with_more  t bs ~off ~len more;
       | Partial continue ->
         transition t (continue bs more ~off ~len)
     in
-    begin match more with
-    | Complete -> t.closed <- true;
-    | Incomplete -> ()
-    end;
+    (* Special case where the parser just started and was fed a zero-length
+     * bigstring. Avoid putting them parser in an error state in this scenario.
+     * If we were already in a `Partial` state, return the error. *)
+    if initial && len = 0 then t.parse_state <- Done;
+    match t.parse_state with
+    | Done when consumed < len ->
+      let off = off + consumed
+      and len = len - consumed in
+      consumed + _read_with_more t bs ~off ~len more
+    | _ -> consumed
+  ;;
+
+  let read_with_more t bs ~off ~len more =
+    let consumed = _read_with_more t bs ~off ~len more in
+    (match more with
+     | Complete ->
+       t.closed <- true
+     | Incomplete -> ());
     consumed
+
+  let force_close t =
+    t.closed <- true;
+  ;;
 
   let next t =
     match t.parse_state with
-    | Done ->
-      if t.closed
-      then `Close
-      else `Read
     | Fail failure -> `Error failure
+    | _ when t.closed -> `Close
+    | Done      -> `Read
     | Partial _ -> `Read
+  ;;
 end

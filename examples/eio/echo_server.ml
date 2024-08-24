@@ -6,15 +6,22 @@ let connection_handler ~sw : Eio.Net.Sockaddr.stream -> _ Eio.Net.stream_socket 
   let module Status = Httpun.Status in
 
   let websocket_handler _client_address wsd =
-    let frame ~opcode ~is_fin:_ ~len:_ payload =
+    let frame ~opcode ~is_fin ~len payload =
+      Format.eprintf "FRAME %a %d %B@." Httpun_ws.Websocket.Opcode.pp_hum opcode len is_fin;
       match (opcode: Httpun_ws.Websocket.Opcode.t) with
       | #Httpun_ws.Websocket.Opcode.standard_non_control as opcode ->
+        let rec on_read bs ~off ~len =
+          Format.eprintf "do it %d %S@." len (Bigstringaf.substring bs ~off ~len);
+          Httpun_ws.Wsd.schedule wsd bs ~kind:opcode ~off ~len;
+          Httpun_ws.Payload.schedule_read payload
+            ~on_eof:ignore
+            ~on_read
+        in
         Httpun_ws.Payload.schedule_read payload
           ~on_eof:ignore
-          ~on_read:(fun bs ~off ~len ->
-          Httpun_ws.Wsd.schedule wsd bs ~kind:opcode ~off ~len)
+          ~on_read
       | `Connection_close ->
-        Httpun_ws.Wsd.close wsd
+        Httpun_ws.Wsd.close ~code:(`Other 1005) wsd
       | `Ping ->
         Httpun_ws.Wsd.send_pong wsd
       | `Pong
