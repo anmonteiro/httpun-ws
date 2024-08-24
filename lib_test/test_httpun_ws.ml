@@ -18,11 +18,10 @@ module Websocket = struct
           let { Parse.payload_length; _ } = frame in
           let payload =
             match payload_length with
-            | 0 -> Payload.create_empty ~on_payload_eof:(fun () -> ())
+            | 0 -> Payload.create_empty ()
             | _ ->
               Payload.create (Bigstringaf.create 0x100)
                 ~when_ready_to_read:(Optional_thunk.some (fun () -> ()))
-                ~on_payload_eof:(fun () -> ())
           in
           let payload_parser = Parse.payload_parser frame payload in
           handler frame payload;
