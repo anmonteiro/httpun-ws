@@ -9,12 +9,14 @@ let sha1 s =
 module Server = struct
   let create_connection_handler
     ?(config = Httpun.Config.default)
-    ~websocket_handler
-    ~error_handler = fun client_addr socket ->
+    ?error_handler
+    ?websocket_error_handler
+    websocket_handler = fun client_addr socket ->
     let connection =
       Httpun_ws.Server_connection.create
         ~sha1
-        ~error_handler:(error_handler client_addr)
+        ?error_handler:(Option.map ~f:(fun f -> f client_addr) error_handler)
+        ?websocket_error_handler:(Option.map ~f:(fun f -> f client_addr) websocket_error_handler)
         (websocket_handler client_addr)
     in
     Gluten_async.Server.create_connection_handler

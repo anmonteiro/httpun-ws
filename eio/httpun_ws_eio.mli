@@ -4,9 +4,10 @@ module Server : sig
 
   val create_connection_handler
     :  ?config : Httpun.Config.t
-    -> websocket_handler : (Eio.Net.Sockaddr.stream -> Wsd.t -> Websocket_connection.input_handlers)
-    -> error_handler : (Eio.Net.Sockaddr.stream -> Server_connection.error_handler)
+    -> ?error_handler : (Eio.Net.Sockaddr.stream -> Httpun.Server_connection.error_handler)
+    -> ?websocket_error_handler : (Eio.Net.Sockaddr.stream -> Server_connection.error_handler)
     -> sw:Eio.Switch.t
+    -> (Eio.Net.Sockaddr.stream -> Wsd.t -> Websocket_connection.input_handlers)
     -> (Eio.Net.Sockaddr.stream -> _ Eio.Net.stream_socket -> unit)
 end
 

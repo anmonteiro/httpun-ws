@@ -39,10 +39,10 @@ module type Server = sig
 
   val create_connection_handler
     :  ?config : Httpun.Config.t
-    -> websocket_handler : (Wsd.t -> Websocket_connection.input_handlers)
-    -> error_handler : Server_connection.error_handler
-    -> socket
-    -> unit Lwt.t
+    -> ?error_handler : Httpun.Server_connection.error_handler
+    -> ?websocket_error_handler : Server_connection.error_handler
+    -> (Wsd.t -> Websocket_connection.input_handlers)
+    -> (socket -> unit Lwt.t)
 end
 
 module Server (Flow : Mirage_flow.S) : Server with type socket = Flow.flow

@@ -114,15 +114,15 @@ let passes_scrutiny ~request_method headers =
 
 let upgrade_headers ~sha1 ~request_method headers =
   if passes_scrutiny ~request_method headers then begin
-    let sec_websocket_key = Headers.get_exn headers "sec-websocket-key" in
-    let accept = sec_websocket_key_proof ~sha1 sec_websocket_key in
-    let upgrade_headers =
+    let accept =
+      let sec_websocket_key = Headers.get_exn headers "sec-websocket-key" in
+      sec_websocket_key_proof ~sha1 sec_websocket_key
+    in
+    Ok
       [ "Upgrade",              "websocket"
       ; "Connection",           "upgrade"
       ; "Sec-Websocket-Accept", accept
       ]
-    in
-    Ok upgrade_headers
   end else
     Error "Didn't pass scrutiny"
 

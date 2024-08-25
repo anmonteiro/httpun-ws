@@ -202,8 +202,10 @@ module Server_connection : sig
 
   (* TODO: should take handshake error handler. *)
   val create
-    : sha1 : (string -> string)
-    -> ?error_handler : error_handler
+    : ?config : Httpun.Config.t
+    -> ?error_handler : Httpun.Server_connection.error_handler
+    -> ?websocket_error_handler : error_handler
+    -> sha1 : (string -> string)
     -> (Wsd.t -> Websocket_connection.input_handlers)
     -> t
 
