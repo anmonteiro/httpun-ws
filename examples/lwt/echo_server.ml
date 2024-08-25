@@ -21,26 +21,20 @@ let connection_handler : Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
       | `Other _ ->
         ()
     in
-    let eof () =
-      Format.eprintf "EOF\n%!";
-      Httpun_ws.Wsd.close wsd
+    let eof ?error () =
+      match error with
+      | Some _ -> assert false
+      | None ->
+        Format.eprintf "EOF\n%!";
+        Httpun_ws.Wsd.close wsd
     in
     { Httpun_ws.Websocket_connection.frame
     ; eof
     }
   in
 
-  let error_handler _client_address wsd (`Exn exn) =
-    let message = Printexc.to_string exn in
-    let payload = Bytes.of_string message in
-    Httpun_ws.Wsd.send_bytes wsd ~kind:`Text payload ~off:0
-      ~len:(Bytes.length payload);
-    Httpun_ws.Wsd.close wsd
-  in
-
   Httpun_ws_lwt_unix.Server.create_connection_handler
     ?config:None
-    ~websocket_error_handler:error_handler
     websocket_handler
 
 

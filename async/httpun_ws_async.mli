@@ -4,7 +4,6 @@ module Server : sig
   val create_connection_handler
     :  ?config : Httpun.Config.t
     -> ?error_handler: ('a -> Httpun.Server_connection.error_handler)
-    -> ?websocket_error_handler: ('a -> Httpun_ws.Server_connection.error_handler)
     -> ('a
          -> Httpun_ws.Wsd.t
          -> Httpun_ws.Websocket_connection.input_handlers)

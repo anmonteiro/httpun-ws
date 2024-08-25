@@ -127,19 +127,18 @@ module Websocket = struct
          | `Pong
          | `Other _ -> assert false
        in
-       let eof () =
-         Format.eprintf "EOF\n%!";
-         Wsd.close wsd
+       let eof ?error () =
+         match error with
+         | Some _ -> assert false
+         | None ->
+           Format.eprintf "EOF\n%!";
+           Wsd.close wsd
        in
        { Websocket_connection.frame
        ; eof
        }
      in
-     let t =
-      Server_connection.create_websocket
-       ~error_handler:(fun _ -> assert false)
-       websocket_handler
-     in
+     let t = Server_connection.create_websocket websocket_handler in
      let frame = serialize_frame ~is_fin:false "hello" in
      let frames = frame ^ frame in
      let len = String.length frames in
@@ -170,11 +169,9 @@ module Websocket = struct
     in
     Client_connection.read t bs ~off:0 ~len
 
-  let default_error_handler _wsd _exn = assert false
-
   let test_reading_ping_frame () =
     let t =
-      Client_connection.create ~error_handler:default_error_handler (fun wsd ->
+      Client_connection.create (fun wsd ->
         let frame ~opcode ~is_fin:_ ~len:_ _payload =
           match opcode with
           | `Text
@@ -185,9 +182,12 @@ module Websocket = struct
           | `Other _ -> Alcotest.fail "expected to parse ping frame"
           | `Ping -> Alcotest.(check pass) "ping frame parsed" true true
         in
-        let eof () =
-          Format.eprintf "EOF\n%!";
-          Wsd.close wsd
+        let eof ?error () =
+          match error with
+          | Some _ -> assert false
+          | None ->
+            Format.eprintf "EOF\n%!";
+            Wsd.close wsd
         in
         { Websocket_connection.frame
         ; eof
@@ -200,7 +200,7 @@ module Websocket = struct
   let test_reading_close_frame () =
     let handler_called = ref false in
     let t =
-      Client_connection.create ~error_handler:default_error_handler (fun wsd ->
+      Client_connection.create (fun wsd ->
         let frame ~opcode ~is_fin:_ ~len:_ _payload =
           handler_called := true;
           match opcode with
@@ -212,9 +212,12 @@ module Websocket = struct
           | `Other _ -> Alcotest.fail "expected to parse close frame"
           | `Connection_close -> Alcotest.(check pass) "close frame parsed" true true
         in
-        let eof () =
-          Format.eprintf "EOF\n%!";
-          Wsd.close wsd
+        let eof ?error () =
+          match error with
+          | Some _ -> assert false
+          | None ->
+            Format.eprintf "EOF\n%!";
+            Wsd.close wsd
         in
         { Websocket_connection.frame
         ; eof
@@ -253,16 +256,19 @@ module Websocket = struct
         | `Other _
         | `Connection_close -> Alcotest.fail "expected to parse text frame"
       in
-      let eof () =
-        Format.eprintf "EOF\n%!";
-        Wsd.close wsd
+      let eof ?error () =
+        match error with
+        | Some _ -> assert false
+        | None ->
+          Format.eprintf "EOF\n%!";
+          Wsd.close wsd
       in
       { Websocket_connection.frame
       ; eof
       }
     in
     let t =
-      Client_connection.create ~error_handler:default_error_handler (ws_handler ["1234567890\n"])
+      Client_connection.create (ws_handler ["1234567890\n"])
     in
     let serialized_frame =
       "\129\139\086\057\046\216\103\011\029\236\099\015\025\224\111\009\036"
@@ -283,7 +289,7 @@ module Websocket = struct
     in
 
     let t =
-      Client_connection.create ~error_handler:default_error_handler (ws_handler ["4567890\n"; "123"])
+      Client_connection.create (ws_handler ["4567890\n"; "123"])
     in
     let first_chunk_parsed = Client_connection.read t bs ~off:0 ~len:9
     in

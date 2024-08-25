@@ -24,9 +24,12 @@ let websocket_handler u wsd =
     Format.printf "%s@." (Bytes.unsafe_to_string payload);)
   in
 
-  let eof () =
-    Printf.eprintf "[EOF]\n%!";
-    Lwt.wakeup_later u ()
+  let eof ?error () =
+    match error with
+    | Some _ -> assert false
+    | None ->
+      Printf.eprintf "[EOF]\n%!";
+      Lwt.wakeup_later u ()
   in
   { Httpun_ws.Websocket_connection.frame
   ; eof

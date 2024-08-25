@@ -20,12 +20,11 @@ let is_closed t =
   | Websocket websocket ->
     Websocket_connection.is_closed websocket
 
-let create ?config ?error_handler ?websocket_error_handler ~sha1 websocket_handler =
+let create ?config ?error_handler ~sha1 websocket_handler =
   let upgrade_handler t upgrade () =
     let ws_connection =
       Websocket_connection.create
         ~mode:`Server
-        ?error_handler:websocket_error_handler
         websocket_handler
     in
     t.state <- Websocket ws_connection;
@@ -66,13 +65,10 @@ let create ?config ?error_handler ?websocket_error_handler ~sha1 websocket_handl
   in
   Lazy.force t
 
-let create_websocket ?error_handler websocket_handler =
+let create_websocket websocket_handler =
   { state =
       Websocket
-        (Websocket_connection.create
-           ~mode:`Server
-           ?error_handler
-           websocket_handler)
+        (Websocket_connection.create ~mode:`Server websocket_handler)
   ; websocket_handler
   }
 

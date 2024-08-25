@@ -37,17 +37,12 @@ module Server (Flow : Mirage_flow.S) = struct
 
   module Server_runtime = Httpun_ws_lwt.Server (Gluten_mirage.Server (Flow))
 
-  let create_connection_handler
-    ?config
-    ?error_handler
-    ?websocket_error_handler
-    websocket_handler =
+  let create_connection_handler ?config ?error_handler websocket_handler =
     fun flow ->
       let websocket_handler = fun () -> websocket_handler in
       Server_runtime.create_connection_handler
        ?config
        ?error_handler:(Option.map (fun f -> fun () -> f) error_handler)
-       ?websocket_error_handler:(Option.map (fun f -> fun () -> f) websocket_error_handler)
        websocket_handler
        ()
        (Gluten_mirage.Buffered_flow.create flow)
@@ -62,7 +57,6 @@ module type Server = sig
   val create_connection_handler
     :  ?config : Httpun.Config.t
     -> ?error_handler : Httpun.Server_connection.error_handler
-    -> ?websocket_error_handler : Server_connection.error_handler
     -> (Wsd.t -> Websocket_connection.input_handlers)
     -> (socket -> unit Lwt.t)
 end

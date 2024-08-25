@@ -23,8 +23,10 @@ let websocket_handler wsd =
     Log.Global.printf "%s\n%!" payload)
   in
 
-  let eof () =
-    Log.Global.error "[EOF]\n%!"
+  let eof ?error () =
+    match error with
+    | Some _ -> assert false
+    | None -> Log.Global.error "[EOF]\n%!"
   in
   { Httpun_ws.Websocket_connection.frame
   ; eof

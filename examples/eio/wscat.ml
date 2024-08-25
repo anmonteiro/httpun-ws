@@ -22,8 +22,7 @@ let websocket_handler env ~sw u wsd =
     Bigstringaf.blit_to_bytes bs ~src_off:off payload ~dst_off:0 ~len;
     Format.printf "%s@." (Bytes.unsafe_to_string payload);)
   in
-
-  let eof () =
+  let eof ?error:_ () =
     Printf.eprintf "[EOF]\n%!";
     Promise.resolve u ()
   in

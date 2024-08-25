@@ -13,13 +13,11 @@ module Server (Server_runtime: Gluten_lwt.Server) = struct
   let create_connection_handler
     ?(config = Httpun.Config.default)
     ?error_handler
-    ?websocket_error_handler
     websocket_handler = fun client_addr socket ->
     let connection =
       Httpun_ws.Server_connection.create
         ~sha1
         ?error_handler:(Option.map (fun f -> f client_addr) error_handler)
-        ?websocket_error_handler:(Option.map (fun f -> f client_addr) websocket_error_handler)
         (websocket_handler client_addr)
     in
     Server_runtime.create_connection_handler

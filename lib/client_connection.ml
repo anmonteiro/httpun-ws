@@ -104,12 +104,11 @@ let connect
   in
   Lazy.force t
 
-let create ?error_handler websocket_handler =
+let create websocket_handler =
   { state =
       Websocket
         (Websocket_connection.create
           ~mode:(`Client Websocket_connection.random_int32)
-          ?error_handler
           websocket_handler) }
 
 let next_read_operation t =

@@ -28,27 +28,26 @@ let connection_handler ~sw : Eio.Net.Sockaddr.stream -> _ Eio.Net.stream_socket 
       | `Other _ ->
         ()
     in
-    let eof () =
-      Format.eprintf "EOF\n%!";
-      Httpun_ws.Wsd.close wsd
+    let eof ?error () =
+      match error with
+      Some (`Exn exn) ->
+        let message = Printexc.to_string exn in
+        let payload = Bytes.of_string message in
+        Httpun_ws.Wsd.send_bytes wsd ~kind:`Text payload ~off:0
+          ~len:(Bytes.length payload);
+        Httpun_ws.Wsd.close wsd
+      | None ->
+        Format.eprintf "EOF\n%!";
+        Httpun_ws.Wsd.close wsd
     in
     { Httpun_ws.Websocket_connection.frame
     ; eof
     }
   in
 
-  let error_handler _client_address wsd (`Exn exn) =
-    let message = Printexc.to_string exn in
-    let payload = Bytes.of_string message in
-    Httpun_ws.Wsd.send_bytes wsd ~kind:`Text payload ~off:0
-      ~len:(Bytes.length payload);
-    Httpun_ws.Wsd.close wsd
-  in
-
   Httpun_ws_eio.Server.create_connection_handler
     ?config:None
     ~sw
-    ~websocket_error_handler:error_handler
     websocket_handler
 
 
@@ -75,7 +74,7 @@ let () =
         Eio.Domain_manager.run domain_mgr (fun () ->
           Eio.Switch.run (fun sw ->
             while true do
-              Eio.Net.accept_fork socket ~sw ~on_error:(fun _ -> assert false) (fun client_sock client_addr ->
+              Eio.Net.accept_fork socket ~sw ~on_error:raise (fun client_sock client_addr ->
                   (* let p, u = Eio.Promise.create () in *)
                   connection_handler ~sw client_addr client_sock)
             done;

@@ -16,13 +16,13 @@ type t =
   { reader : [`Parse of string list * string] Reader.t
   ; wsd    : Wsd.t
   ; frame_handler : frame_handler
-  ; eof : unit -> unit
+  ; eof : ?error:error -> unit -> unit
   ; frame_queue: (Parse.t * Payload.t) Queue.t
   }
 
 type input_handlers =
   { frame : frame_handler
-  ; eof : unit -> unit }
+  ; eof : ?error:error -> unit -> unit }
 
 (* TODO: this should be passed as an argument from the runtime, to allow for
  * cryptographically secure random number generation. *)
@@ -36,17 +36,10 @@ type input_handlers =
 let random_int32 () =
   Random.int32 Int32.max_int
 
-let default_error_handler wsd (`Exn exn) =
-  let message = Printexc.to_string exn in
-  let payload = Bytes.of_string message in
-  Wsd.send_bytes wsd ~kind:`Text payload ~off:0 ~len:(Bytes.length payload);
-  Wsd.close wsd
-;;
-
 let wakeup_reader t = Reader.wakeup t.reader
 
-let create ~mode ?(error_handler = default_error_handler) websocket_handler =
-  let wsd = Wsd.create ~error_handler mode in
+let create ~mode websocket_handler =
+  let wsd = Wsd.create mode in
   let { frame = frame_handler; eof } = websocket_handler wsd in
   let frame_queue = Queue.create () in
   let handler frame payload =
@@ -78,7 +71,7 @@ let shutdown t =
   Wsd.close t.wsd
 
 let set_error_and_handle t error =
-  Wsd.report_error t.wsd error;
+  Wsd.report_error t.wsd error t.eof;
   shutdown t
 
 let advance_frame_queue t =
