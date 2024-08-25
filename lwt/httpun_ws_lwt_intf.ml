@@ -41,8 +41,9 @@ module type Server = sig
 
   val create_connection_handler
     :  ?config : Httpun.Config.t
-    -> websocket_handler : (addr -> Wsd.t -> Websocket_connection.input_handlers)
-    -> error_handler : (addr -> Httpun_ws.Server_connection.error_handler)
+    -> ?error_handler : (addr -> Httpun.Server_connection.error_handler)
+    -> ?websocket_error_handler : (addr -> Server_connection.error_handler)
+    -> (addr -> Wsd.t -> Websocket_connection.input_handlers)
     -> (addr -> socket -> unit Lwt.t)
 end
 

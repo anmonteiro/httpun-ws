@@ -3,10 +3,11 @@ open Async
 module Server : sig
   val create_connection_handler
     :  ?config : Httpun.Config.t
-    -> websocket_handler : ( 'a
-                           -> Httpun_ws.Wsd.t
-                           -> Httpun_ws.Websocket_connection.input_handlers)
-    -> error_handler     : ('a -> Httpun_ws.Server_connection.error_handler)
+    -> ?error_handler: ('a -> Httpun.Server_connection.error_handler)
+    -> ?websocket_error_handler: ('a -> Httpun_ws.Server_connection.error_handler)
+    -> ('a
+         -> Httpun_ws.Wsd.t
+         -> Httpun_ws.Websocket_connection.input_handlers)
     -> 'a
     -> ([`Active], [< Socket.Address.t] as 'a) Socket.t
     -> unit Deferred.t

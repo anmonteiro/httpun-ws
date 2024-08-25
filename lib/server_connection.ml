@@ -20,24 +20,32 @@ let is_closed t =
   | Websocket websocket ->
     Websocket_connection.is_closed websocket
 
-let create ~sha1 ?error_handler websocket_handler =
-  let rec upgrade_handler upgrade () =
-    let t = Lazy.force t in
+let create ?config ?error_handler ?websocket_error_handler ~sha1 websocket_handler =
+  let upgrade_handler t upgrade () =
     let ws_connection =
-      Websocket_connection.create ~mode:`Server ?error_handler websocket_handler
+      Websocket_connection.create
+        ~mode:`Server
+        ?error_handler:websocket_error_handler
+        websocket_handler
     in
     t.state <- Websocket ws_connection;
     upgrade (Gluten.make (module Websocket_connection) ws_connection);
-  and request_handler { Gluten.reqd; upgrade } =
+  in
+  let rec request_handler { Gluten.reqd; upgrade } =
     let error msg =
-      let response = Httpun.(Response.create
-        ~headers:(Headers.of_list ["Connection", "close"])
-        `Bad_request)
+      let response = Httpun.Response.create
+        ~headers:(Httpun.Headers.of_list ["Connection", "close"])
+        `Bad_request
       in
       Httpun.Reqd.respond_with_string reqd response msg
     in
     let ret = Httpun.Reqd.try_with reqd (fun () ->
-      match Handshake.respond_with_upgrade ~sha1 reqd (upgrade_handler upgrade) with
+      match
+        Handshake.respond_with_upgrade
+          ~sha1
+          reqd
+          (upgrade_handler (Lazy.force t) upgrade)
+      with
       | Ok () -> ()
       | Error msg -> error msg)
     in
@@ -51,7 +59,7 @@ let create ~sha1 ?error_handler websocket_handler =
           (Server_handshake.create_upgradable
             ~protocol:(module Httpun.Server_connection)
             ~create:
-              (Httpun.Server_connection.create ?config:None ?error_handler:None)
+              (Httpun.Server_connection.create ?config ?error_handler)
             request_handler)
     ; websocket_handler
     }
@@ -76,11 +84,8 @@ let shutdown t =
 
 let report_exn t exn =
   match t.state with
-  | Handshake _ ->
-    (* TODO: we need to handle this properly. There was an error in the upgrade *)
-    assert false
-  | Websocket websocket ->
-    Websocket_connection.report_exn websocket exn
+  | Handshake hs -> Server_handshake.report_exn hs exn;
+  | Websocket websocket -> Websocket_connection.report_exn websocket exn
 
 let next_read_operation t =
   match t.state with

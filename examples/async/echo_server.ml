@@ -45,8 +45,8 @@ let connection_handler : ([< Socket.Address.t] as 'a) -> ([`Active], 'a) Socket.
 
   Httpun_ws_async.Server.create_connection_handler
     ?config:None
-    ~websocket_handler
-    ~error_handler
+    ~websocket_error_handler:error_handler
+    websocket_handler
 
 let main port max_accepts_per_batch () =
   let where_to_listen = Tcp.Where_to_listen.of_port port in

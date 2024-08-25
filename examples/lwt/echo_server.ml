@@ -40,8 +40,8 @@ let connection_handler : Unix.sockaddr -> Lwt_unix.file_descr -> unit Lwt.t =
 
   Httpun_ws_lwt_unix.Server.create_connection_handler
     ?config:None
-    ~websocket_handler
-    ~error_handler
+    ~websocket_error_handler:error_handler
+    websocket_handler
 
 
 

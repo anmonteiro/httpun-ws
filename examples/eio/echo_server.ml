@@ -47,9 +47,9 @@ let connection_handler ~sw : Eio.Net.Sockaddr.stream -> _ Eio.Net.stream_socket 
 
   Httpun_ws_eio.Server.create_connection_handler
     ?config:None
-    ~websocket_handler
-    ~error_handler
     ~sw
+    ~websocket_error_handler:error_handler
+    websocket_handler
 
 
 let () =
