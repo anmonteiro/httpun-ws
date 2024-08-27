@@ -26,26 +26,20 @@ let connection_handler : ([< Socket.Address.t] as 'a) -> ([`Active], 'a) Socket.
       | `Other _ ->
         ()
     in
-    let eof () =
-      Log.Global.error "EOF\n%!";
-      Httpun_ws.Wsd.close wsd
+    let eof ?error () =
+      match error with
+      | Some _ -> assert false
+      | None ->
+        Log.Global.error "EOF\n%!";
+        Httpun_ws.Wsd.close wsd
     in
     { Httpun_ws.Websocket_connection.frame
     ; eof
     }
   in
 
-  let error_handler _client_address wsd (`Exn exn) =
-    let message = Exn.to_string exn in
-    let payload = Bytes.of_string message in
-    Httpun_ws.Wsd.send_bytes wsd ~kind:`Text payload ~off:0
-      ~len:(Bytes.length payload);
-    Httpun_ws.Wsd.close wsd
-  in
-
   Httpun_ws_async.Server.create_connection_handler
     ?config:None
-    ~websocket_error_handler:error_handler
     websocket_handler
 
 let main port max_accepts_per_batch () =

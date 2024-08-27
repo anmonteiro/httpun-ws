@@ -26,22 +26,18 @@ let connection_handler =
       | `Other _ ->
         ()
     in
-    let eof () =
-      Format.eprintf "EOF\n%!";
-      Httpun_ws.Wsd.close wsd
+    let eof ?error () =
+      match error with
+      | Some _ -> assert false
+      | None ->
+        Format.eprintf "EOF\n%!";
+        Httpun_ws.Wsd.close wsd
     in
     { Httpun_ws.Websocket_connection.frame
     ; eof
     }
   in
 
-  let error_handler wsd (`Exn exn) =
-    let message = Printexc.to_string exn in
-    let payload = Bytes.of_string message in
-    Httpun_ws.Wsd.send_bytes wsd ~kind:`Text payload ~off:0
-      ~len:(Bytes.length payload);
-    Httpun_ws.Wsd.close wsd
-  in
   let http_error_handler _client_address ?request:_ error handle =
     let message =
       match error with
@@ -54,9 +50,7 @@ let connection_handler =
   in
   let upgrade_handler addr upgrade () =
     let ws_conn =
-      Httpun_ws.Server_connection.create_websocket
-        ~error_handler
-        (websocket_handler addr)
+      Httpun_ws.Server_connection.create_websocket (websocket_handler addr)
     in
     upgrade
       (Gluten.make (module Httpun_ws.Server_connection) ws_conn)

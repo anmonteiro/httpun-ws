@@ -147,9 +147,11 @@ module Handshake : sig
 end
 
 module Websocket_connection : sig
+  type error = [ `Exn of exn ]
+
   type input_handlers =
     { frame : opcode:Websocket.Opcode.t -> is_fin:bool -> len:int -> Payload.t -> unit
-    ; eof   : unit -> unit }
+    ; eof : ?error:error -> unit -> unit }
 end
 
 module Client_connection : sig
@@ -168,9 +170,7 @@ module Client_connection : sig
     -> string
     -> t
 
-  val create
-    :  ?error_handler:(Wsd.t -> [`Exn of exn] -> unit)
-    -> (Wsd.t -> Websocket_connection.input_handlers) -> t
+  val create : (Wsd.t -> Websocket_connection.input_handlers) -> t
 
   val next_read_operation  : t -> [ `Read | `Yield | `Close ]
   val next_write_operation
@@ -196,22 +196,16 @@ end
 module Server_connection : sig
   type t
 
-  type error = [ `Exn of exn ]
-
-  type error_handler = Wsd.t -> error -> unit
-
   (* TODO: should take handshake error handler. *)
   val create
     : ?config : Httpun.Config.t
     -> ?error_handler : Httpun.Server_connection.error_handler
-    -> ?websocket_error_handler : error_handler
     -> sha1 : (string -> string)
     -> (Wsd.t -> Websocket_connection.input_handlers)
     -> t
 
   val create_websocket
-  : ?error_handler:error_handler
-  -> (Wsd.t -> Websocket_connection.input_handlers)
+  :  (Wsd.t -> Websocket_connection.input_handlers)
   -> t
 
   val next_read_operation  : t -> [ `Read | `Yield | `Close ]

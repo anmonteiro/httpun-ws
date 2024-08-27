@@ -8,18 +8,15 @@ type t =
   { faraday : Faraday.t
   ; mode : mode
   ; mutable wakeup : Optional_thunk.t
-  ; error_handler: error_handler
   ; mutable error_code: [`Ok | error ]
   }
-and error_handler = t -> error -> unit
 
 let default_ready_to_write = Sys.opaque_identity (fun () -> ())
 
-let create ~error_handler mode =
+let create mode =
   { faraday = Faraday.create 0x1000
   ; mode
   ; wakeup = Optional_thunk.none
-  ; error_handler
   ; error_code = `Ok
   }
 
@@ -116,12 +113,12 @@ let error_code t =
   | #error as error -> Some error
   | `Ok             -> None
 
-let report_error t error =
+let report_error t error (error_handler : ?error:error -> unit -> unit) =
   match t.error_code with
   | `Ok ->
-    t.error_code <- (error :> [`Ok | error]);
+    t.error_code <- (error :> [`Ok | error ]);
     if not (is_closed t)
-    then t.error_handler t error
+    then error_handler ~error ()
   | `Exn _exn ->
     close ~code:`Abnormal_closure t
 

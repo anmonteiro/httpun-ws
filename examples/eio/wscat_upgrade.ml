@@ -23,9 +23,12 @@ let websocket_handler env ~sw u wsd =
     Format.printf "%s@." (Bytes.unsafe_to_string payload);)
   in
 
-  let eof () =
-    Printf.eprintf "[EOF]\n%!";
-    Promise.resolve u ()
+  let eof ?error () =
+    match error with
+    | Some _ -> assert false
+    | None ->
+      Printf.eprintf "[EOF]\n%!";
+      Promise.resolve u ()
   in
   { Httpun_ws.Websocket_connection.frame
   ; eof
