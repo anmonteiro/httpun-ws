@@ -35,6 +35,9 @@ let next_write_operation t =
 let read t =
   Httpun.Client_connection.read t.connection
 
+let read_eof t =
+  Httpun.Client_connection.read_eof t.connection
+
 let yield_reader t =
   Httpun.Client_connection.yield_reader t.connection
 
