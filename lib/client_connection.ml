@@ -129,7 +129,7 @@ let read t bs ~off ~len =
 
 let read_eof t bs ~off ~len =
   match t.state with
-  | Handshake handshake -> Client_handshake.read handshake bs ~off ~len
+  | Handshake handshake -> Client_handshake.read_eof handshake bs ~off ~len
   | Websocket websocket -> Websocket_connection.read_eof websocket bs ~off ~len
 
 let next_write_operation t =
