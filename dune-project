@@ -43,9 +43,11 @@
  (depends
   (ocaml
    (>= "4.08"))
-  httpun-ws
+  (httpun-ws
+   (= :version))
   lwt
-  digestif
+  (digestif
+   (>= "1.2.0"))
   (gluten-lwt
    (>= "0.2.0"))))
 
@@ -55,7 +57,8 @@
  (depends
   (ocaml
    (>= "4.08"))
-  httpun-ws-lwt
+  (httpun-ws-lwt
+   (= :version))
   (gluten-lwt-unix
    (>= "0.2.0"))))
 
@@ -65,8 +68,10 @@
  (depends
   (ocaml
    (>= "4.08"))
-  httpun-ws
-  digestif
+  (httpun-ws
+   (= :version))
+  (digestif
+   (>= "1.2.0"))
   (gluten-eio
    (>= "0.2.1"))))
 
@@ -76,9 +81,10 @@
  (depends
   (ocaml
    (>= "4.08"))
-  httpun-ws-lwt
+  (httpun-ws-lwt
+   (= :version))
   (gluten-mirage
-   (>= "0.2.0"))
+   (>= "0.5.0"))
   (mirage-flow
    (>= "2.0.0"))
   cstruct))
@@ -89,8 +95,11 @@
  (depends
   (ocaml
    (>= "4.08"))
-  httpun-ws
+  (httpun-ws
+   (= :version))
   (async
    (>= "v0.15.0"))
-  gluten-async
-  digestif))
+  (gluten-async
+   (>= "0.5.0"))
+  (digestif
+   (>= "1.2.0"))))
