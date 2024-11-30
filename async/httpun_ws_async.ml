@@ -1,16 +1,15 @@
 open Core
 open Async
 
-let sha1 s =
-  s
-  |> Digestif.SHA1.digest_string
-  |> Digestif.SHA1.to_raw_string
+let sha1 s = s |> Digestif.SHA1.digest_string |> Digestif.SHA1.to_raw_string
 
 module Server = struct
   let create_connection_handler
-    ?(config = Httpun.Config.default)
-    ?error_handler
-    websocket_handler = fun client_addr socket ->
+        ?(config = Httpun.Config.default)
+        ?error_handler
+        websocket_handler
+    =
+   fun client_addr socket ->
     let connection =
       Httpun_ws.Server_connection.create
         ~sha1
@@ -26,9 +25,18 @@ module Server = struct
 end
 
 module Client = struct
-  let connect ~nonce ~host ~port ~resource ~error_handler ~websocket_handler socket =
-    let headers = Httpun.Headers.of_list
-      ["host", String.concat ~sep:":" [host; string_of_int port]]
+  let connect
+        ~nonce
+        ~host
+        ~port
+        ~resource
+        ~error_handler
+        ~websocket_handler
+        socket
+    =
+    let headers =
+      Httpun.Headers.of_list
+        [ "host", String.concat ~sep:":" [ host; string_of_int port ] ]
     in
     let connection =
       Httpun_ws.Client_connection.connect
@@ -41,8 +49,8 @@ module Client = struct
     in
     Deferred.ignore_m
       (Gluten_async.Client.create
-        ~read_buffer_size:0x1000
-        ~protocol:(module Httpun_ws.Client_connection)
-        connection
-        socket)
+         ~read_buffer_size:0x1000
+         ~protocol:(module Httpun_ws.Client_connection)
+         connection
+         socket)
 end

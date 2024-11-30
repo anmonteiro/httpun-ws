@@ -5,10 +5,10 @@ let create_request ~nonce ~headers target =
   let headers =
     Headers.add_list
       headers
-      [ "upgrade"              , "websocket"
-      ; "connection"           , "upgrade"
+      [ "upgrade", "websocket"
+      ; "connection", "upgrade"
       ; "sec-websocket-version", "13"
-      ; "sec-websocket-key"    , nonce
+      ; "sec-websocket-key", nonce
       ]
   in
   Httpun.Request.create ~headers `GET target
@@ -25,7 +25,7 @@ let sec_websocket_key_proof ~sha1 sec_websocket_key =
    *   [RFC4648]), of this concatenation is then returned in the server's
    *   handshake. *)
   let concatenation =
-   sec_websocket_key ^ "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+    sec_websocket_key ^ "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
   in
   Base64.encode_exn ~pad:true (sha1 concatenation)
 
@@ -41,23 +41,23 @@ module CI = struct
     let b = 0x8080 lor codes in
     let c = b - 0x6161 in
     let d = lnot (b - 0x7b7b) in
-    let e = (c land d) land (lnot codes land 0x8080) in
+    let e = c land d land (lnot codes land 0x8080) in
     let upper = codes - (e lsr 2) in
     upper lsr 8 = upper land 0xff
 
   let equal x y =
     let len = String.length x in
-    len = String.length y && (
-      let equal_so_far = ref true in
-      let i            = ref 0 in
-      while !equal_so_far && !i < len do
-        let c1 = Char.code (String.unsafe_get x !i) in
-        let c2 = Char.code (String.unsafe_get y !i) in
-        equal_so_far := char_code_equal_ci c1 c2;
-        incr i
-      done;
-      !equal_so_far
-    )
+    len = String.length y
+    &&
+    let equal_so_far = ref true in
+    let i = ref 0 in
+    while !equal_so_far && !i < len do
+      let c1 = Char.code (String.unsafe_get x !i) in
+      let c2 = Char.code (String.unsafe_get y !i) in
+      equal_so_far := char_code_equal_ci c1 c2;
+      incr i
+    done;
+    !equal_so_far
 end
 
 (* TODO: this function can just return the reason *)
@@ -89,47 +89,51 @@ let passes_scrutiny ~request_method headers =
    *
    *   Note: there are 9 points in the above section of the RFC, and the last
    *   3 refer to optional fields.
-   *)
- match
-   request_method,
-   Headers.get_exn headers "host",
-   Headers.get_exn headers "upgrade",
-   Headers.get_exn headers "connection",
-   Headers.get_exn headers "sec-websocket-key",
-   Headers.get_exn headers "sec-websocket-version"
-   with
-   (* 1,   2 *)
- | `GET, _host, upgrade, connection, sec_websocket_key, "13" ->
-   (* 3 *)
-   CI.equal upgrade "websocket" &&
-   (* 4 *)
-   (List.exists
-     (fun v -> CI.equal (String.trim v) "upgrade")
-     (String.split_on_char ',' connection)) &&
-   (* 5 *)
-   (try String.length (Base64.decode_exn ~pad:true sec_websocket_key) = 16
-    with | _ -> false)
- | _ -> false
- | exception _ -> false
+  *)
+  match
+    ( request_method
+    , Headers.get_exn headers "host"
+    , Headers.get_exn headers "upgrade"
+    , Headers.get_exn headers "connection"
+    , Headers.get_exn headers "sec-websocket-key"
+    , Headers.get_exn headers "sec-websocket-version" )
+  with
+  (* 1,   2 *)
+  | `GET, _host, upgrade, connection, sec_websocket_key, "13" ->
+    (* 3 *)
+    CI.equal upgrade "websocket"
+    (* 4 *)
+    && List.exists
+         (fun v -> CI.equal (String.trim v) "upgrade")
+         (String.split_on_char ',' connection)
+    &&
+    (* 5 *)
+    (try String.length (Base64.decode_exn ~pad:true sec_websocket_key) = 16 with
+      | _ -> false)
+  | _ -> false
+  | exception _ -> false
 
 let upgrade_headers ~sha1 ~request_method headers =
-  if passes_scrutiny ~request_method headers then begin
+  if passes_scrutiny ~request_method headers
+  then
     let accept =
       let sec_websocket_key = Headers.get_exn headers "sec-websocket-key" in
       sec_websocket_key_proof ~sha1 sec_websocket_key
     in
     Ok
-      [ "Upgrade",              "websocket"
-      ; "Connection",           "upgrade"
+      [ "Upgrade", "websocket"
+      ; "Connection", "upgrade"
       ; "Sec-Websocket-Accept", accept
       ]
-  end else
-    Error "Didn't pass scrutiny"
+  else Error "Didn't pass scrutiny"
 
-let respond_with_upgrade ?(headers=Headers.empty) ~sha1 reqd upgrade_handler =
+let respond_with_upgrade ?(headers = Headers.empty) ~sha1 reqd upgrade_handler =
   let request = Httpun.Reqd.request reqd in
   match upgrade_headers ~sha1 ~request_method:request.meth request.headers with
   | Ok upgrade_headers ->
-    Httpun.Reqd.respond_with_upgrade reqd (Headers.add_list headers upgrade_headers) upgrade_handler;
+    Httpun.Reqd.respond_with_upgrade
+      reqd
+      (Headers.add_list headers upgrade_headers)
+      upgrade_handler;
     Ok ()
   | Error msg -> Error msg

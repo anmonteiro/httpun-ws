@@ -4,15 +4,16 @@ type state =
   | Handshake of Client_handshake.t
   | Websocket of Websocket_connection.t
 
-type t = { mutable state: state }
+type t = { mutable state : state }
 
 type error =
   [ Httpun.Client_connection.error
-  | `Handshake_failure of Httpun.Response.t * Httpun.Body.Reader.t ]
+  | `Handshake_failure of Httpun.Response.t * Httpun.Body.Reader.t
+  ]
 
 let passes_scrutiny ~status ~accept headers =
- (*
-  * The client MUST validate the server's response as follows:
+  (*
+     * The client MUST validate the server's response as follows:
   *
   *   1. If the status code received from the server is not 101, the client
   *      handles the response per HTTP [RFC2616] procedures [...].
@@ -43,26 +44,26 @@ let passes_scrutiny ~status ~accept headers =
   *     header field to determine which extensions are requested is
   *     discussed in Section 9.1.)
   * *)
- match
-   status,
-   Headers.get_exn headers "upgrade",
-   Headers.get_exn headers "connection",
-   Headers.get_exn headers "sec-websocket-accept"
-   with
-   (* 1 *)
- | `Switching_protocols, upgrade, connection, sec_websocket_accept ->
-   (* 2 *)
-   Handshake.CI.equal upgrade "websocket" &&
-   (* 3 *)
-   (List.exists
-     (fun v -> Handshake.CI.equal (String.trim v) "upgrade")
-     (String.split_on_char ',' connection)) &&
-   (* 4 *)
-   String.equal sec_websocket_accept accept
-   (* TODO(anmonteiro): 5 *)
+  match
+    ( status
+    , Headers.get_exn headers "upgrade"
+    , Headers.get_exn headers "connection"
+    , Headers.get_exn headers "sec-websocket-accept" )
+  with
+  (* 1 *)
+  | `Switching_protocols, upgrade, connection, sec_websocket_accept ->
+    (* 2 *)
+    Handshake.CI.equal upgrade "websocket"
+    (* 3 *)
+    && List.exists
+         (fun v -> Handshake.CI.equal (String.trim v) "upgrade")
+         (String.split_on_char ',' connection)
+    &&
+    (* 4 *)
+    String.equal sec_websocket_accept accept
+  (* TODO(anmonteiro): 5 *)
   | _ -> false
   | exception _ -> false
-;;
 
 let handshake_exn t =
   match t.state with
@@ -70,37 +71,41 @@ let handshake_exn t =
   | Websocket _ -> assert false
 
 let connect
-    ~nonce
-    ?(headers = Httpun.Headers.empty)
-    ~sha1
-    ~error_handler
-    ~websocket_handler
-    target
+      ~nonce
+      ?(headers = Httpun.Headers.empty)
+      ~sha1
+      ~error_handler
+      ~websocket_handler
+      target
   =
   let rec response_handler response response_body =
-    let { Httpun.Response.status; headers; _  } = response in
+    let { Httpun.Response.status; headers; _ } = response in
     let t = Lazy.force t in
     let nonce = Base64.encode_exn nonce in
     let accept = Handshake.sec_websocket_key_proof ~sha1 nonce in
-    if passes_scrutiny ~status ~accept headers then begin
+    if passes_scrutiny ~status ~accept headers
+    then (
       Httpun.Body.Reader.close response_body;
       let handshake = handshake_exn t in
       t.state <-
         Websocket
-         (Websocket_connection.create
-          ~mode:(`Client Websocket_connection.random_int32)
-          websocket_handler);
-      Client_handshake.close handshake
-    end else
-      error_handler (`Handshake_failure(response, response_body))
-
-  and t = lazy
-    { state = Handshake (Client_handshake.create
-        ~nonce
-        ~headers
-        ~error_handler:(error_handler :> Httpun.Client_connection.error_handler)
-        ~response_handler
-        target) }
+          (Websocket_connection.create
+             ~mode:(`Client Websocket_connection.random_int32)
+             websocket_handler);
+      Client_handshake.close handshake)
+    else error_handler (`Handshake_failure (response, response_body))
+  and t =
+    lazy
+      { state =
+          Handshake
+            (Client_handshake.create
+               ~nonce
+               ~headers
+               ~error_handler:
+                 (error_handler :> Httpun.Client_connection.error_handler)
+               ~response_handler
+               target)
+      }
   in
   Lazy.force t
 
@@ -108,19 +113,20 @@ let create websocket_handler =
   { state =
       Websocket
         (Websocket_connection.create
-          ~mode:(`Client Websocket_connection.random_int32)
-          websocket_handler) }
+           ~mode:(`Client Websocket_connection.random_int32)
+           websocket_handler)
+  }
 
 let next_read_operation t =
   match t.state with
   | Handshake handshake -> Client_handshake.next_read_operation handshake
   | Websocket websocket ->
-    match Websocket_connection.next_read_operation websocket with
+    (match Websocket_connection.next_read_operation websocket with
     | `Error (`Parse (_, _message)) ->
-        (* TODO(anmonteiro): handle this *)
-        assert false
-        (* set_error_and_handle t (`Exn (Failure message)); `Close *)
-    | (`Read | `Yield | `Close) as operation -> operation
+      (* TODO(anmonteiro): handle this *)
+      assert false
+      (* set_error_and_handle t (`Exn (Failure message)); `Close *)
+    | (`Read | `Yield | `Close) as operation -> operation)
 
 let read t bs ~off ~len =
   match t.state with
@@ -140,13 +146,13 @@ let next_write_operation t =
 let report_write_result t result =
   match t.state with
   | Handshake handshake -> Client_handshake.report_write_result handshake result
-  | Websocket websocket -> Websocket_connection.report_write_result websocket result
+  | Websocket websocket ->
+    Websocket_connection.report_write_result websocket result
 
 let report_exn t exn =
-  begin match t.state with
+  match t.state with
   | Handshake handshake -> Client_handshake.report_exn handshake exn
   | Websocket websocket -> Websocket_connection.report_exn websocket exn
-  end
 
 let yield_reader t f =
   match t.state with
@@ -158,7 +164,6 @@ let yield_writer t f =
   | Handshake handshake -> Client_handshake.yield_writer handshake f
   | Websocket websocket -> Websocket_connection.yield_writer websocket f
 
-
 let is_closed t =
   match t.state with
   | Handshake handshake -> Client_handshake.is_closed handshake
@@ -168,4 +173,3 @@ let shutdown t =
   match t.state with
   | Handshake handshake -> Client_handshake.close handshake
   | Websocket websocket -> Websocket_connection.shutdown websocket
-;;
