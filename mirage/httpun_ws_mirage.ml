@@ -38,41 +38,55 @@ module Server (Flow : Mirage_flow.S) = struct
   module Server_runtime = Httpun_ws_lwt.Server (Gluten_mirage.Server (Flow))
 
   let create_connection_handler ?config ?error_handler websocket_handler =
-    fun flow ->
-      let websocket_handler = fun () -> websocket_handler in
-      Server_runtime.create_connection_handler
-       ?config
-       ?error_handler:(Option.map (fun f -> fun () -> f) error_handler)
-       websocket_handler
-       ()
-       (Gluten_mirage.Buffered_flow.create flow)
+   fun flow ->
+    let websocket_handler = fun () -> websocket_handler in
+    Server_runtime.create_connection_handler
+      ?config
+      ?error_handler:(Option.map (fun f -> fun () -> f) error_handler)
+      websocket_handler
+      ()
+      (Gluten_mirage.Buffered_flow.create flow)
 end
 
 (* Almost like the `Httpun_ws_lwt.Server` module type but we don't need the
  * client address argument in Mirage. It's somewhere else. *)
 module type Server = sig
   open Httpun_ws
+
   type socket
 
-  val create_connection_handler
-    :  ?config : Httpun.Config.t
-    -> ?error_handler : Httpun.Server_connection.error_handler
+  val create_connection_handler :
+     ?config:Httpun.Config.t
+    -> ?error_handler:Httpun.Server_connection.error_handler
     -> (Wsd.t -> Websocket_connection.input_handlers)
-    -> (socket -> unit Lwt.t)
+    -> socket
+    -> unit Lwt.t
 end
 
 module type Client = Httpun_ws_lwt.Client
 
 module Client (Flow : Mirage_flow.S) = struct
-    include Httpun_ws_lwt.Client (Gluten_mirage.Client (Flow))
-    type socket = Flow.flow
+  include Httpun_ws_lwt.Client (Gluten_mirage.Client (Flow))
 
+  type socket = Flow.flow
 
   let connect
-        ?config ~nonce ~host ~port ~resource ~error_handler
-        ~websocket_handler flow =
+        ?config
+        ~nonce
+        ~host
+        ~port
+        ~resource
+        ~error_handler
+        ~websocket_handler
+        flow
+    =
     connect
-      ?config ~nonce ~host ~port ~resource
-      ~error_handler ~websocket_handler
+      ?config
+      ~nonce
+      ~host
+      ~port
+      ~resource
+      ~error_handler
+      ~websocket_handler
       (Gluten_mirage.Buffered_flow.create flow)
-  end
+end

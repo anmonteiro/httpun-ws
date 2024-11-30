@@ -32,100 +32,90 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *----------------------------------------------------------------------------*)
 
+(* TODO(anmonteiro):
+ *  - automatic chunking of messages?
+*)
+
 module IOVec = Httpun.IOVec
 
-  type t =
+type t =
   { faraday : Faraday.t
   ; mutable read_scheduled : bool
   ; mutable on_eof : unit -> unit
   ; mutable eof_has_been_called : bool
   ; mutable on_read : Bigstringaf.t -> off:int -> len:int -> unit
-  ; when_ready_to_read             : Optional_thunk.t
+  ; when_ready_to_read : Optional_thunk.t
   }
 
-  let default_on_eof         = Sys.opaque_identity (fun () -> ())
-  let default_on_read        = Sys.opaque_identity (fun _ ~off:_ ~len:_ -> ())
+let default_on_eof = Sys.opaque_identity (fun () -> ())
+let default_on_read = Sys.opaque_identity (fun _ ~off:_ ~len:_ -> ())
 
-  let create buffer ~when_ready_to_read =
-    { faraday = Faraday.of_bigstring buffer
-    ; read_scheduled         = false
-    ; eof_has_been_called    = false
-    ; on_eof                 = default_on_eof
-    ; on_read                = default_on_read
-    ; when_ready_to_read
-    }
+let create buffer ~when_ready_to_read =
+  { faraday = Faraday.of_bigstring buffer
+  ; read_scheduled = false
+  ; eof_has_been_called = false
+  ; on_eof = default_on_eof
+  ; on_read = default_on_read
+  ; when_ready_to_read
+  }
 
-  let create_empty () =
-    let t =
-      create
-        Bigstringaf.empty
-        ~when_ready_to_read:Optional_thunk.none
-    in
-    Faraday.close t.faraday;
-    t
+let create_empty () =
+  let t = create Bigstringaf.empty ~when_ready_to_read:Optional_thunk.none in
+  Faraday.close t.faraday;
+  t
 
-  let is_closed t =
-    Faraday.is_closed t.faraday
+let is_closed t = Faraday.is_closed t.faraday
+let unsafe_faraday t = t.faraday
+let ready_to_read t = Optional_thunk.call_if_some t.when_ready_to_read
 
-  let unsafe_faraday t =
-    t.faraday
+let rec do_execute_read t on_eof on_read =
+  match Faraday.operation t.faraday with
+  | `Yield -> ()
+  | `Close ->
+    t.read_scheduled <- false;
+    t.on_eof <- default_on_eof;
+    t.on_read <- default_on_read;
+    if not t.eof_has_been_called
+    then (
+      t.eof_has_been_called <- true;
+      on_eof ())
+  (* [Faraday.operation] never returns an empty list of iovecs *)
+  | `Writev [] -> assert false
+  | `Writev (iovec :: _) ->
+    t.read_scheduled <- false;
+    t.on_eof <- default_on_eof;
+    t.on_read <- default_on_read;
+    let { IOVec.buffer; off; len } = iovec in
+    Faraday.shift t.faraday len;
+    on_read buffer ~off ~len;
+    execute_read t
 
-  let ready_to_read t = Optional_thunk.call_if_some t.when_ready_to_read
+and execute_read t =
+  if t.read_scheduled then do_execute_read t t.on_eof t.on_read
 
-  let rec do_execute_read t on_eof on_read =
-    match Faraday.operation t.faraday with
-    | `Yield           -> ()
-    | `Close           ->
-      t.read_scheduled <- false;
-      t.on_eof         <- default_on_eof;
-      t.on_read        <- default_on_read;
-      if not t.eof_has_been_called then begin
-        t.eof_has_been_called <- true;
-        on_eof ();
-      end
-    (* [Faraday.operation] never returns an empty list of iovecs *)
-    | `Writev []       -> assert false
-    | `Writev (iovec::_) ->
-      t.read_scheduled <- false;
-      t.on_eof         <- default_on_eof;
-      t.on_read        <- default_on_read;
-      let { IOVec.buffer; off; len } = iovec in
-      Faraday.shift t.faraday len;
-      on_read buffer ~off ~len;
-      execute_read t
-  and execute_read t =
-    if t.read_scheduled then do_execute_read t t.on_eof t.on_read
+let schedule_read t ~on_eof ~on_read =
+  if t.read_scheduled
+  then failwith "Payload.schedule_read: reader already scheduled";
+  if not (is_closed t)
+  then (
+    t.read_scheduled <- true;
+    t.on_eof <- on_eof;
+    t.on_read <- on_read);
+  do_execute_read t on_eof on_read;
+  ready_to_read t
 
-  let schedule_read t ~on_eof ~on_read =
-    if t.read_scheduled
-    then failwith "Payload.schedule_read: reader already scheduled";
-    if not (is_closed t)
-    then begin
-      t.read_scheduled <- true;
-      t.on_eof         <- on_eof;
-      t.on_read        <- on_read;
-    end;
-    do_execute_read t on_eof on_read;
-    ready_to_read t
+let close t =
+  Faraday.close t.faraday;
+  execute_read t;
+  ready_to_read t
 
-  let close t =
-    Faraday.close t.faraday;
-    execute_read t;
-    ready_to_read t
-  ;;
-
-  let has_pending_output t = Faraday.has_pending_output t.faraday
-
-  let is_read_scheduled t = t.read_scheduled
+let has_pending_output t = Faraday.has_pending_output t.faraday
+let is_read_scheduled t = t.read_scheduled
 
 type input_state =
- | Ready
- | Wait
- | Complete
+  | Ready
+  | Wait
+  | Complete
 
 let input_state t : input_state =
-  if is_closed t
-  then Complete
-  else if is_read_scheduled t
-  then Ready
-  else Wait
+  if is_closed t then Complete else if is_read_scheduled t then Ready else Wait

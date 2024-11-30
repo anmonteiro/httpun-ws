@@ -36,30 +36,30 @@ open Httpun_ws
 
 module type Server = sig
   type socket
-
   type addr
 
-  val create_connection_handler
-    :  ?config : Httpun.Config.t
-    -> ?error_handler : (addr -> Httpun.Server_connection.error_handler)
+  val create_connection_handler :
+     ?config:Httpun.Config.t
+    -> ?error_handler:(addr -> Httpun.Server_connection.error_handler)
     -> (addr -> Wsd.t -> Websocket_connection.input_handlers)
-    -> (addr -> socket -> unit Lwt.t)
+    -> addr
+    -> socket
+    -> unit Lwt.t
 end
-
 
 module type Client = sig
   type t
   type socket
 
   (* Perform HTTP/1.1 handshake and upgrade to WS. *)
-  val connect
-    :  ?config : Httpun.Config.t
-    -> nonce             : string
-    -> host              : string
-    -> port              : int
-    -> resource          : string
-    -> error_handler : (Client_connection.error -> unit)
-    -> websocket_handler : (Wsd.t -> Websocket_connection.input_handlers)
+  val connect :
+     ?config:Httpun.Config.t
+    -> nonce:string
+    -> host:string
+    -> port:int
+    -> resource:string
+    -> error_handler:(Client_connection.error -> unit)
+    -> websocket_handler:(Wsd.t -> Websocket_connection.input_handlers)
     -> socket
     -> t Lwt.t
 
