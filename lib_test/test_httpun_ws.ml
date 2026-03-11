@@ -8,13 +8,33 @@ module Websocket = struct
     let opcode = Alcotest.testable Opcode.pp_hum ( = )
   end
 
+  module Close_code = struct
+    let test_of_code_standard_range () =
+      let open Httpun_ws.Websocket.Close_code in
+      Alcotest.(check (option int))
+        "1000 maps to normal closure"
+        (Some 1000)
+        (Option.map to_int (of_int 1000));
+      Alcotest.(check (option int))
+        "1008 maps to policy violation"
+        (Some 1008)
+        (Option.map to_int (of_int 1008));
+      Alcotest.(check (option int))
+        "1015 maps to TLS handshake"
+        (Some 1015)
+        (Option.map to_int (of_int 1015))
+    ;;
+
+    let tests = [ "close code mapping", `Quick, test_of_code_standard_range ]
+  end
+
   module Parser = struct
     open Httpun_ws__
 
-    let parse_frame ~handler serialized_frame =
+    let parse_frame ?(expect_mask = false) ~handler serialized_frame =
       let parser =
         let open Angstrom in
-        Parse.frame ~expect_mask:false >>= fun frame ->
+        Parse.frame ~expect_mask >>= fun frame ->
           let { Parse.payload_length; _ } = frame in
           let payload =
             match payload_length with
@@ -32,11 +52,11 @@ module Websocket = struct
       | Ok frame -> frame
       | Error err -> Alcotest.fail err
 
-    let serialize_frame ~is_fin frame =
+    let serialize_frame ?(mode = `Server) ~is_fin frame =
       let f = Faraday.create 0x100 in
       Serialize.serialize_bytes
         f
-        ~mode:`Server
+        ~mode
         ~is_fin
         ~opcode:`Text
         ~payload:(Bytes.of_string frame)
@@ -47,7 +67,10 @@ module Websocket = struct
 
     let test_parsing_ping_frame () =
       let parsed = ref false in
-      parse_frame "\137\128\000\000\046\216" ~handler:(fun frame _payload ->
+      parse_frame
+        ~expect_mask:true
+        "\137\128\000\000\046\216"
+        ~handler:(fun frame _payload ->
         parsed := true;
         Alcotest.check Testable.opcode "opcode" `Ping frame.opcode;
         Alcotest.(check (option int32)) "mask" (Some 11992l) frame.mask;
@@ -74,6 +97,7 @@ module Websocket = struct
       let parsed = ref false in
       let payload = ref None in
       parse_frame
+        ~expect_mask:true
         "\129\139\086\057\046\216\103\011\029\236\099\015\025\224\111\009\036"
         ~handler:(fun frame pload ->
           parsed := true;
@@ -137,7 +161,12 @@ module Websocket = struct
         { Websocket_connection.frame; eof }
       in
       let t = Server_connection.create_websocket websocket_handler in
-      let frame = serialize_frame ~is_fin:false "hello" in
+      let frame =
+        serialize_frame
+          ~mode:(`Client (fun () -> 0x01020304l))
+          ~is_fin:true
+          "hello"
+      in
       let frames = frame ^ frame in
       let len = String.length frames in
       let bs = Bigstringaf.of_string ~off:0 ~len frames in
@@ -179,8 +208,8 @@ module Websocket = struct
         in
         { Websocket_connection.frame; eof })
     in
-    let parsed = read_frame t "\137\128\000\000\046\216" in
-    Alcotest.(check int) "parsed entire frame" 6 parsed
+    let parsed = read_frame t "\137\000" in
+    Alcotest.(check int) "parsed entire frame" 2 parsed
 
   let test_reading_close_frame () =
     let handler_called = ref false in
@@ -245,9 +274,7 @@ module Websocket = struct
       { Websocket_connection.frame; eof }
     in
     let t = Client_connection.create (ws_handler [ "1234567890\n" ]) in
-    let serialized_frame =
-      "\129\139\086\057\046\216\103\011\029\236\099\015\025\224\111\009\036"
-    in
+    let serialized_frame = "\129\0111234567890\n" in
     let parsed = read_frame t serialized_frame in
     Alcotest.(check bool) "handler called" true !handler_called;
     Alcotest.(check int)
@@ -267,10 +294,10 @@ module Websocket = struct
     in
 
     let t = Client_connection.create (ws_handler [ "4567890\n"; "123" ]) in
-    let first_chunk_parsed = Client_connection.read t bs ~off:0 ~len:9 in
+    let first_chunk_parsed = Client_connection.read t bs ~off:0 ~len:5 in
     Alcotest.(check bool) "handler not yet called" false !handler_called;
-    Alcotest.(check int) "parsed entire frame" 9 first_chunk_parsed;
-    let next_chunk_parsed = Client_connection.read t bs ~off:9 ~len:8 in
+    Alcotest.(check int) "parsed entire frame" 5 first_chunk_parsed;
+    let next_chunk_parsed = Client_connection.read t bs ~off:5 ~len:8 in
     Alcotest.(check bool) "handler called" true !handler_called;
     Alcotest.(check int) "parsed entire frame" 8 next_chunk_parsed
 
@@ -284,6 +311,7 @@ end
 let () =
   Alcotest.run
     "httpun-ws unit tests"
-    [ "websocket frame parsing", Websocket.Parser.tests
+    [ "close codes", Websocket.Close_code.tests
+    ; "websocket frame parsing", Websocket.Parser.tests
     ; "reading", Websocket.tests
     ]

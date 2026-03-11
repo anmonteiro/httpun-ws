@@ -128,7 +128,7 @@ module Close_code = struct
     if code > 0xffff || code < 1000
     then None
     else if code < 1016
-    then Some (unsafe_of_code (code land 0b1111))
+    then Some (unsafe_of_code (code - 1000))
     else Some (`Other code)
 
   let of_code_exn code =
@@ -136,7 +136,7 @@ module Close_code = struct
     then failwith "Close_code.of_code_exn: value can't fit in two bytes";
     if code < 1000
     then failwith "Close_code.of_code_exn: value in invalid range 0-999";
-    if code < 1016 then unsafe_of_code (code land 0b1111) else `Other code
+    if code < 1016 then unsafe_of_code (code - 1000) else `Other code
 
   let to_int = code
   let of_int = of_code
