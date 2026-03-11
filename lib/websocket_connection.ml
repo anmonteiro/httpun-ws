@@ -13,6 +13,10 @@ type t =
   ; frame_handler : frame_handler
   ; eof : ?error:error -> unit -> unit
   ; frame_queue : (Parse.t * Payload.t) Queue.t
+  ; mutable fragmented_message :
+      [ `Text
+      | `Binary ]
+      option
   }
 
 type input_handlers =
@@ -32,11 +36,31 @@ type input_handlers =
 let random_int32 () = Random.int32 Int32.max_int
 let wakeup_reader t = Reader.wakeup t.reader
 
+let validate_frame_sequence t { Parse.opcode; is_fin; _ } =
+  match opcode, t.fragmented_message with
+  | `Continuation, None ->
+    failwith "received a continuation frame without a fragmented message"
+  | `Continuation, Some _ when is_fin ->
+    t.fragmented_message <- None
+  | `Continuation, Some _ -> ()
+  | (`Text | `Binary), Some _ ->
+    failwith "received a new data frame before finishing a fragmented message"
+  | `Text, None when not is_fin ->
+    t.fragmented_message <- Some `Text
+  | `Binary, None when not is_fin ->
+    t.fragmented_message <- Some `Binary
+  | (`Connection_close | `Ping | `Pong), _ -> ()
+  | (`Text | `Binary), None -> ()
+  | `Other _, _ ->
+    assert false
+;;
+
 let create ~mode websocket_handler =
   let wsd = Wsd.create mode in
   let { frame = frame_handler; eof } = websocket_handler wsd in
   let frame_queue = Queue.create () in
-  let handler frame payload =
+  let rec handler frame payload =
+    validate_frame_sequence (Lazy.force t) frame;
     let call_handler = Queue.is_empty frame_queue in
 
     Queue.push (frame, payload) frame_queue;
@@ -44,10 +68,19 @@ let create ~mode websocket_handler =
     then
       let { Parse.opcode; is_fin; payload_length; _ } = frame in
       frame_handler ~opcode ~is_fin ~len:payload_length payload
-  in
-  let rec reader = lazy (Reader.create handler)
-  and t =
-    lazy { reader = Lazy.force reader; wsd; frame_handler; eof; frame_queue }
+  and reader =
+    lazy
+      (Reader.create
+         ~expect_mask:(match mode with `Server -> true | `Client _ -> false)
+         handler)
+  and t = lazy
+    { reader = Lazy.force reader
+    ; wsd
+    ; frame_handler
+    ; eof
+    ; frame_queue
+    ; fragmented_message = None
+    }
   in
   Lazy.force t
 

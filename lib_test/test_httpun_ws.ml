@@ -14,19 +14,19 @@ module Websocket = struct
     let parse_frame ~handler serialized_frame =
       let parser =
         let open Angstrom in
-        Parse.frame >>= fun frame ->
-        let { Parse.payload_length; _ } = frame in
-        let payload =
-          match payload_length with
-          | 0 -> Payload.create_empty ()
-          | _ ->
-            Payload.create
-              (Bigstringaf.create 0x100)
-              ~when_ready_to_read:(Optional_thunk.some (fun () -> ()))
-        in
-        let payload_parser = Parse.payload_parser frame payload in
-        handler frame payload;
-        payload_parser
+        Parse.frame ~expect_mask:false >>= fun frame ->
+          let { Parse.payload_length; _ } = frame in
+          let payload =
+            match payload_length with
+            | 0 -> Payload.create_empty ()
+            | _ ->
+              Payload.create
+                (Bigstringaf.create 0x100)
+                ~when_ready_to_read:(Optional_thunk.some (fun () -> ()))
+          in
+          let payload_parser = Parse.payload_parser frame payload in
+          handler frame payload;
+          payload_parser
       in
       match Angstrom.parse_string ~consume:All parser serialized_frame with
       | Ok frame -> frame

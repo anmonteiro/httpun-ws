@@ -19,6 +19,7 @@ in
       dune-release
       git
     ]) else [ ]) ++ [
+    packages.autobahntestsuite
     merlin
     ocamlformat
     httpun-lwt-unix

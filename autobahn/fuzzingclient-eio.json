@@ -1,0 +1,16 @@
+{
+  "options": {
+    "failByDrop": false
+  },
+  "outdir": "/reports",
+  "cases": [
+    "*"
+  ],
+  "exclude-cases": [],
+  "servers": [
+    {
+      "agent": "httpun-ws-eio",
+      "url": "ws://127.0.0.1:9001"
+    }
+  ]
+}

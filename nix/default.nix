@@ -1,4 +1,4 @@
-{ nix-filter, lib, stdenv, ocamlPackages, doCheck ? true }:
+{ nix-filter, lib, stdenv, ocamlPackages, pkgs, doCheck ? true }:
 
 with ocamlPackages;
 
@@ -14,6 +14,8 @@ let
   } // args);
 
   httpun-wsPackages = rec {
+    autobahntestsuite = import ./autobahn-testsuite.nix { inherit pkgs; };
+
     httpun-ws = buildHttpun-ws {
       pname = "httpun-ws";
       src = genSrc {

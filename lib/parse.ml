@@ -42,11 +42,11 @@ let payload_length_of_headers headers =
 
 (* let payload_length t = payload_length_of_headers t.headers *)
 
+let has_mask headers =
+  let bits = Bigstringaf.unsafe_get headers 1 |> Char.code in
+  (bits land 0b1000_0000) = 0b1000_0000
+
 let mask =
-  let has_mask headers =
-    let bits = Bigstringaf.unsafe_get headers 1 |> Char.code in
-    bits land 0b1000_0000 = 0b1000_0000
-  in
   let mask_exn headers =
     let bits = Bigstringaf.unsafe_get headers 1 |> Char.code in
     if bits = 254
@@ -59,6 +59,36 @@ let mask =
   in
   fun headers ->
     if not (has_mask headers) then None else Some (mask_exn headers)
+
+let reserved_bits headers =
+  let bits = Bigstringaf.unsafe_get headers 0 |> Char.code in
+  (bits lsr 4) land 0b0111
+
+let validate_headers ~expect_mask headers =
+  let opcode = opcode headers in
+  let payload_length = payload_length_of_headers headers in
+  if reserved_bits headers <> 0 then
+    failwith "received a frame with non-zero reserved bits";
+  if has_mask headers <> expect_mask then
+    failwith
+      (if expect_mask
+       then "received an unmasked frame from client"
+       else "received a masked frame from server");
+  begin match opcode with
+  | `Other _ ->
+    failwith "received a frame with a reserved opcode"
+  | `Connection_close
+  | `Ping
+  | `Pong ->
+    if not (is_fin headers) then
+      failwith "received a fragmented control frame";
+    if payload_length > 125 then
+      failwith "received a control frame larger than 125 bytes"
+  | `Continuation
+  | `Text
+  | `Binary -> ()
+  end
+;;
 
 let payload_offset_of_bits bits =
   let initial_offset = 2 in
@@ -117,14 +147,17 @@ let payload_parser t payload =
   in
   read_exact t.payload_length >>= fun () -> finish payload
 
-let frame =
+let frame ~expect_mask =
   let open Angstrom in
-  parse_headers >>| fun headers ->
-  let payload_length = payload_length_of_headers headers
-  and is_fin = is_fin headers
-  and opcode = opcode headers
-  and mask = mask headers in
-  { is_fin; opcode; mask; payload_length }
+  parse_headers
+  >>| fun headers ->
+    validate_headers ~expect_mask headers;
+    let payload_length = payload_length_of_headers headers
+    and is_fin = is_fin headers
+    and opcode = opcode headers
+    and mask = mask headers in
+    { is_fin; opcode; mask; payload_length }
+;;
 
 module Reader = struct
   module AU = Angstrom.Unbuffered
@@ -147,12 +180,12 @@ module Reader = struct
     t.wakeup <- Optional_thunk.none;
     Optional_thunk.call_if_some f
 
-  let create frame_handler =
+  let create ~expect_mask frame_handler =
     let rec parser t =
       let open Angstrom in
       let buf = Bigstringaf.create 0x1000 in
       skip_many
-        ( frame <* commit >>= fun frame ->
+        (frame ~expect_mask <* commit >>= fun frame ->
           let { payload_length; _ } = frame in
           let payload =
             match payload_length with
