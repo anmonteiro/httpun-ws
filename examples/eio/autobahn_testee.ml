@@ -1,13 +1,52 @@
 let connection_handler ~sw :
     Eio.Net.Sockaddr.stream -> _ Eio.Net.stream_socket -> unit =
   let websocket_handler _client_address wsd =
-    let close_with_payload payload =
-      let bytes = Buffer.create 16 in
+    let fragmented_message :
+        ([ `Text | `Binary ] * Bytes.t list * int) option ref
+      =
+      ref None
+    in
+    let schedule_read_all payload k =
+      let chunks = Buffer.create 256 in
       let rec on_read bs ~off ~len =
-        Buffer.add_string bytes (Bigstringaf.substring bs ~off ~len);
+        Buffer.add_string chunks (Bigstringaf.substring bs ~off ~len);
         Httpun_ws.Payload.schedule_read payload ~on_eof ~on_read
-      and on_eof () =
-        let raw = Buffer.contents bytes in
+      and on_eof () = k (Buffer.contents chunks) in
+      Httpun_ws.Payload.schedule_read payload ~on_eof ~on_read
+    in
+    let schedule_read_chunks payload k =
+      let rev_chunks = ref [] in
+      let total_len = ref 0 in
+      let rec on_read bs ~off ~len =
+        let chunk = Bytes.create len in
+        Bigstringaf.blit_to_bytes bs ~src_off:off chunk ~dst_off:0 ~len;
+        rev_chunks := chunk :: !rev_chunks;
+        total_len := !total_len + len;
+        Httpun_ws.Payload.schedule_read payload ~on_eof ~on_read
+      and on_eof () = k !rev_chunks !total_len in
+      Httpun_ws.Payload.schedule_read payload ~on_eof ~on_read
+    in
+    let send_bytes (kind : [ `Text | `Binary ]) rev_chunks total_len =
+      let bytes =
+        match total_len with
+        | 0 -> Bytes.empty
+        | _ ->
+          let bytes = Bytes.create total_len in
+          let off = ref 0 in
+          List.iter
+            (fun chunk ->
+              let len = Bytes.length chunk in
+              Bytes.blit chunk 0 bytes !off len;
+              off := !off + len)
+            (List.rev rev_chunks);
+          bytes
+      in
+      Httpun_ws.Wsd.send_bytes wsd ~is_fin:true
+        ~kind:(kind :> [ `Binary | `Continuation | `Text ])
+        bytes ~off:0 ~len:total_len
+    in
+    let close_with_payload payload =
+      schedule_read_all payload @@ fun raw ->
         let code =
           match String.length raw with
           | 0 -> None
@@ -20,49 +59,44 @@ let connection_handler ~sw :
             end
         in
         Httpun_ws.Wsd.close ?code wsd
-      in
-      Httpun_ws.Payload.schedule_read payload ~on_eof ~on_read
     in
     let pong payload =
-      let chunks = ref [] in
-      let total_len = ref 0 in
-      let rec on_read bs ~off ~len =
-        chunks := Bigstringaf.substring bs ~off ~len :: !chunks;
-        total_len := !total_len + len;
-        Httpun_ws.Payload.schedule_read payload ~on_eof ~on_read
-      and on_eof () =
+      schedule_read_all payload @@ fun data ->
         let application_data =
-          match !total_len with
+          match String.length data with
           | 0 -> None
           | len ->
             let buffer = Bigstringaf.create len in
-            let off = ref 0 in
-            List.iter
-              (fun chunk ->
-                Bigstringaf.blit_from_string chunk ~src_off:0 buffer
-                  ~dst_off:!off ~len:(String.length chunk);
-                off := !off + String.length chunk)
-              (List.rev !chunks);
+            Bigstringaf.blit_from_string data ~src_off:0 buffer ~dst_off:0 ~len;
             Some Httpun.IOVec.{ buffer; off = 0; len }
         in
         Httpun_ws.Wsd.send_pong ?application_data wsd
-      in
-      Httpun_ws.Payload.schedule_read payload ~on_eof ~on_read
     in
     let frame ~opcode ~is_fin ~len:_ payload =
       match (opcode : Httpun_ws.Websocket.Opcode.t) with
-      | #Httpun_ws.Websocket.Opcode.standard_non_control as kind ->
-        let chunks = Buffer.create 16 in
-        let rec on_read bs ~off ~len =
-          Buffer.add_string chunks (Bigstringaf.substring bs ~off ~len);
-          Httpun_ws.Payload.schedule_read payload ~on_eof ~on_read
-        and on_eof () =
-          let data = Buffer.contents chunks in
-          let payload = Bytes.of_string data in
-          Httpun_ws.Wsd.send_bytes wsd ~is_fin ~kind payload ~off:0
-            ~len:(Bytes.length payload)
-        in
-        Httpun_ws.Payload.schedule_read payload ~on_eof ~on_read
+      | `Text ->
+        schedule_read_chunks payload @@ fun chunks total_len ->
+        if is_fin
+        then send_bytes `Text chunks total_len
+        else fragmented_message := Some (`Text, chunks, total_len)
+      | `Binary ->
+        schedule_read_chunks payload @@ fun chunks total_len ->
+        if is_fin
+        then send_bytes `Binary chunks total_len
+        else fragmented_message := Some (`Binary, chunks, total_len)
+      | `Continuation ->
+        schedule_read_chunks payload @@ fun rev_chunks total_len ->
+        begin match !fragmented_message with
+        | Some (kind, prev_rev_chunks, prev_total_len) ->
+          let rev_chunks = rev_chunks @ prev_rev_chunks in
+          let total_len = prev_total_len + total_len in
+          if is_fin
+          then (
+            fragmented_message := None;
+            send_bytes kind rev_chunks total_len)
+          else fragmented_message := Some (kind, rev_chunks, total_len)
+        | None -> ()
+        end
       | `Connection_close -> close_with_payload payload
       | `Ping -> pong payload
       | `Pong

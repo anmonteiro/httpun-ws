@@ -121,10 +121,10 @@ let rec _next_read_operation t =
         (* we just don't advance the request queue in the case of a parser
           error. *)
         op
-      | `Read as op ->
-        (* Keep reading when in a "partial" state (`Read). *)
+      | `Read ->
+        (* Drain already-parsed queued frames before polling the socket again. *)
         advance_frame_queue t;
-        op
+        _next_read_operation t
       | `Close ->
         advance_frame_queue t;
         _next_read_operation t))
