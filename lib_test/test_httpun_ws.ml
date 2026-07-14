@@ -111,7 +111,7 @@ module Websocket = struct
       let rev_payload_chunks = read_payload (Option.get !payload) in
       Alcotest.(check (list string)) "payload" [ "hello" ] rev_payload_chunks
 
-    let test_parsing_multiple_frames () =
+    let test_parsing_multiple_frames n () =
       let frames_parsed = ref 0 in
       let websocket_handler wsd =
         let frame ~opcode ~is_fin:_ ~len:_ payload =
@@ -138,20 +138,21 @@ module Websocket = struct
       in
       let t = Server_connection.create_websocket websocket_handler in
       let frame = serialize_frame ~is_fin:false "hello" in
-      let frames = frame ^ frame in
+      let frames = List.init n (fun _ -> frame) |> String.concat "" in
       let len = String.length frames in
       let bs = Bigstringaf.of_string ~off:0 ~len frames in
       let read = Server_connection.read t bs ~off:0 ~len in
       ignore @@ Server_connection.next_read_operation t;
       Alcotest.(check int) "Reads both frames" len read;
-      Alcotest.(check int) "Both frames parsed and handled" 2 !frames_parsed
+      Alcotest.(check int) "Frames parsed and handled" n !frames_parsed
 
     let tests =
       [ "parsing ping frame", `Quick, test_parsing_ping_frame
       ; "parsing close frame", `Quick, test_parsing_close_frame
       ; "parsing text frame", `Quick, test_parsing_text_frame
       ; "parsing fin bit", `Quick, test_parsing_fin_bit
-      ; "parse 2 frames in a payload", `Quick, test_parsing_multiple_frames
+      ; "parse 2 frames in a payload", `Quick, (test_parsing_multiple_frames 2)
+      ; "parse 3 frames in a payload", `Quick, (test_parsing_multiple_frames 3)
       ]
   end
 
