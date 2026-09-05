@@ -32,11 +32,14 @@ module Websocket = struct
       | Ok frame -> frame
       | Error err -> Alcotest.fail err
 
+    (* Client frames must be masked (RFC 6455 §5.1); serialize as a client
+       would, with a fixed mask, so these bytes are also valid input to a
+       server-mode connection. *)
     let serialize_frame ~is_fin frame =
       let f = Faraday.create 0x100 in
       Serialize.serialize_bytes
         f
-        ~mode:`Server
+        ~mode:(`Client (fun () -> 0x12345678l))
         ~is_fin
         ~opcode:`Text
         ~payload:(Bytes.of_string frame)
@@ -146,12 +149,169 @@ module Websocket = struct
       Alcotest.(check int) "Reads both frames" len read;
       Alcotest.(check int) "Both frames parsed and handled" 2 !frames_parsed
 
+    (* Feeds [serialized_frames] to a fresh server-mode connection and
+       returns it along with the count of frames that reached the
+       registered [frame] callback -- should stay 0 whenever every frame in
+       [serialized_frames] violates RFC 6455. *)
+    let run_server_connection
+      ?(on_frame = fun ~opcode:_ ~is_fin:_ ~len:_ _payload -> ())
+      serialized_frames
+      =
+      let frames_parsed = ref 0 in
+      let websocket_handler _wsd =
+        let frame ~opcode ~is_fin ~len payload =
+          incr frames_parsed;
+          on_frame ~opcode ~is_fin ~len payload
+        in
+        let eof ?error:_ () = () in
+        { Websocket_connection.frame; eof }
+      in
+      let t = Server_connection.create_websocket websocket_handler in
+      let len = String.length serialized_frames in
+      let bs = Bigstringaf.of_string ~off:0 ~len serialized_frames in
+      ignore (Server_connection.read t bs ~off:0 ~len);
+      ignore (Server_connection.next_read_operation t);
+      t, frames_parsed
+
+    let raw_frame ~mode ~is_fin ~opcode ?(payload = "") () =
+      let f = Faraday.create 0x100 in
+      Serialize.serialize_bytes
+        f
+        ~mode
+        ~is_fin
+        ~opcode
+        ~payload:(Bytes.of_string payload)
+        ~off:0
+        ~src_off:0
+        ~len:(String.length payload);
+      Faraday.serialize_to_string f
+
+    let client_mode = `Client (fun () -> 0x12345678l)
+
+    (* Sets one of RSV1-3 (index 0-2, RFC 6455 §5.2) on an already-serialized
+       frame's first byte. *)
+    let set_rsv_bit frame rsv_index =
+      let b = Bytes.of_string frame in
+      Bytes.set_uint8 b 0 (Bytes.get_uint8 b 0 lor (1 lsl (6 - rsv_index)));
+      Bytes.unsafe_to_string b
+
+    let test_masked_text_frame_accepted_once () =
+      let t, frames_parsed =
+        run_server_connection (serialize_frame ~is_fin:true "hello")
+      in
+      Alcotest.(check int) "delivered exactly once" 1 !frames_parsed;
+      Alcotest.(check bool)
+        "connection stays open"
+        false
+        (Server_connection.is_closed t)
+
+    let test_unmasked_frame_rejected () =
+      let unmasked =
+        raw_frame ~mode:`Server ~is_fin:true ~opcode:`Text ~payload:"hello" ()
+      in
+      let t, frames_parsed = run_server_connection unmasked in
+      Alcotest.(check int) "no frame delivered" 0 !frames_parsed;
+      Alcotest.(check bool)
+        "connection closed"
+        true
+        (Server_connection.is_closed t)
+
+    let test_rsv_bits_rejected () =
+      let masked =
+        raw_frame
+          ~mode:client_mode
+          ~is_fin:true
+          ~opcode:`Text
+          ~payload:"hello"
+          ()
+      in
+      List.iter
+        (fun rsv_index ->
+          let frame = set_rsv_bit masked rsv_index in
+          let t, frames_parsed = run_server_connection frame in
+          Alcotest.(check int)
+            (Printf.sprintf "RSV%d: no frame delivered" (rsv_index + 1))
+            0
+            !frames_parsed;
+          Alcotest.(check bool)
+            (Printf.sprintf "RSV%d: connection closed" (rsv_index + 1))
+            true
+            (Server_connection.is_closed t))
+        [ 0; 1; 2 ]
+
+    let test_reserved_opcode_rejected () =
+      let frame =
+        raw_frame ~mode:client_mode ~is_fin:true ~opcode:(`Other 3) ()
+      in
+      let t, frames_parsed = run_server_connection frame in
+      Alcotest.(check int) "no frame delivered" 0 !frames_parsed;
+      Alcotest.(check bool)
+        "connection closed"
+        true
+        (Server_connection.is_closed t)
+
+    let test_control_frame_invariants () =
+      let seen_opcode = ref None in
+      let valid_ping = raw_frame ~mode:client_mode ~is_fin:true ~opcode:`Ping () in
+      let t, frames_parsed =
+        run_server_connection
+          ~on_frame:(fun ~opcode ~is_fin:_ ~len:_ _payload ->
+            seen_opcode := Some opcode)
+          valid_ping
+      in
+      Alcotest.(check int) "valid ping delivered" 1 !frames_parsed;
+      (match !seen_opcode with
+      | Some opcode -> Alcotest.check Testable.opcode "opcode" `Ping opcode
+      | None -> Alcotest.fail "ping not delivered");
+      Alcotest.(check bool)
+        "valid ping: connection stays open"
+        false
+        (Server_connection.is_closed t);
+
+      let fragmented_ping =
+        raw_frame ~mode:client_mode ~is_fin:false ~opcode:`Ping ()
+      in
+      let t, frames_parsed = run_server_connection fragmented_ping in
+      Alcotest.(check int)
+        "fragmented ping: no frame delivered"
+        0
+        !frames_parsed;
+      Alcotest.(check bool)
+        "fragmented ping: connection closed"
+        true
+        (Server_connection.is_closed t);
+
+      let oversized_ping =
+        raw_frame
+          ~mode:client_mode
+          ~is_fin:true
+          ~opcode:`Ping
+          ~payload:(String.make 126 'a')
+          ()
+      in
+      let t, frames_parsed = run_server_connection oversized_ping in
+      Alcotest.(check int)
+        "oversized ping: no frame delivered"
+        0
+        !frames_parsed;
+      Alcotest.(check bool)
+        "oversized ping: connection closed"
+        true
+        (Server_connection.is_closed t)
+
     let tests =
       [ "parsing ping frame", `Quick, test_parsing_ping_frame
       ; "parsing close frame", `Quick, test_parsing_close_frame
       ; "parsing text frame", `Quick, test_parsing_text_frame
       ; "parsing fin bit", `Quick, test_parsing_fin_bit
       ; "parse 2 frames in a payload", `Quick, test_parsing_multiple_frames
+      ; ( "masked text frame accepted once"
+        , `Quick
+        , test_masked_text_frame_accepted_once )
+      ; "unmasked client frame rejected", `Quick, test_unmasked_frame_rejected
+      ; "nonzero RSV bits rejected", `Quick, test_rsv_bits_rejected
+      ; "reserved opcode rejected", `Quick, test_reserved_opcode_rejected
+      ; "control frame invariants", `Quick, test_control_frame_invariants
       ]
   end
 

@@ -13,6 +13,7 @@ type t =
   ; frame_handler : frame_handler
   ; eof : ?error:error -> unit -> unit
   ; frame_queue : (Parse.t * Payload.t) Queue.t
+  ; violation : string option ref
   }
 
 type input_handlers =
@@ -36,18 +37,39 @@ let create ~mode websocket_handler =
   let wsd = Wsd.create mode in
   let { frame = frame_handler; eof } = websocket_handler wsd in
   let frame_queue = Queue.create () in
+  let role : Parse.role = match mode with `Client _ -> `Client | `Server -> `Server in
+  let violation = ref None in
   let handler frame payload =
-    let call_handler = Queue.is_empty frame_queue in
-
-    Queue.push (frame, payload) frame_queue;
-    if call_handler
-    then
-      let { Parse.opcode; is_fin; payload_length; _ } = frame in
-      frame_handler ~opcode ~is_fin ~len:payload_length payload
+    match !violation with
+    | Some _ ->
+      (* A prior frame already violated RFC 6455; discard everything from
+         here on instead of parsing/delivering further frames. *)
+      Payload.close payload
+    | None ->
+      (match Parse.validate ~role frame with
+      | Error msg ->
+        violation := Some msg;
+        Payload.close payload;
+        if not (Wsd.is_closed wsd) then Wsd.close ~code:`Protocol_error wsd;
+        eof ~error:(`Exn (Failure msg)) ()
+      | Ok () ->
+        let call_handler = Queue.is_empty frame_queue in
+        Queue.push (frame, payload) frame_queue;
+        if call_handler
+        then
+          let { Parse.opcode; is_fin; payload_length; _ } = frame in
+          frame_handler ~opcode ~is_fin ~len:payload_length payload)
   in
   let rec reader = lazy (Reader.create handler)
   and t =
-    lazy { reader = Lazy.force reader; wsd; frame_handler; eof; frame_queue }
+    lazy
+      { reader = Lazy.force reader
+      ; wsd
+      ; frame_handler
+      ; eof
+      ; frame_queue
+      ; violation
+      }
   in
   Lazy.force t
 
@@ -108,12 +130,19 @@ let rec _next_read_operation t =
     next
 
 let next_read_operation t =
-  match _next_read_operation t with
-  | `Error (`Parse (_, message)) ->
-    set_error_and_handle t (`Exn (Failure message));
+  match !(t.violation) with
+  | Some _ ->
+    (* Already reported to [eof] and closed [wsd] from within the frame
+       parser's [handler]; just keep the reader from asking for more. *)
+    shutdown_reader t;
     `Close
-  | `Read -> `Read
-  | (`Yield | `Close) as operation -> operation
+  | None ->
+    (match _next_read_operation t with
+    | `Error (`Parse (_, message)) ->
+      set_error_and_handle t (`Exn (Failure message));
+      `Close
+    | `Read -> `Read
+    | (`Yield | `Close) as operation -> operation)
 
 let next_write_operation t = Wsd.next t.wsd
 let report_exn t exn = set_error_and_handle t (`Exn exn)

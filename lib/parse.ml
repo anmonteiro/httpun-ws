@@ -3,17 +3,21 @@ type t =
   ; is_fin : bool
   ; mask : int32 option
   ; opcode : Websocket.Opcode.t
+  ; rsv : int
   }
+
+type role =
+  [ `Client
+  | `Server
+  ]
 
 let is_fin headers =
   let bits = Bigstringaf.unsafe_get headers 0 |> Char.code in
   bits land (1 lsl 7) = 1 lsl 7
 
-(* let rsv t =
-  let bits = Bigstringaf.unsafe_get t.headers 0 |> Char.code in
+let rsv headers =
+  let bits = Bigstringaf.unsafe_get headers 0 |> Char.code in
   (bits lsr 4) land 0b0111
-;;
-*)
 
 let opcode headers =
   let bits = Bigstringaf.unsafe_get headers 0 |> Char.code in
@@ -123,8 +127,40 @@ let frame =
   let payload_length = payload_length_of_headers headers
   and is_fin = is_fin headers
   and opcode = opcode headers
-  and mask = mask headers in
-  { is_fin; opcode; mask; payload_length }
+  and mask = mask headers
+  and rsv = rsv headers in
+  { is_fin; opcode; mask; payload_length; rsv }
+
+(* RFC 6455 conformance, checked before a frame is ever handed to a
+   frame_handler:
+   - §5.1: a server MUST close the connection upon receiving an unmasked
+     frame from a client.
+   - §5.2: RSV1-3 MUST be zero unless a negotiated extension defines their
+     use; this library negotiates none, so any nonzero RSV bit is an error.
+   - §5.2/11.8: opcodes 0x3-0x7 and 0xb-0xf are reserved.
+   - §5.4/5.5: control frames must not be fragmented and their payload must
+     not exceed 125 bytes. *)
+let validate ~role (t : t) =
+  if role = `Server && t.mask = None
+  then Error "a server must reject an unmasked client frame (RFC 6455 §5.1)"
+  else if t.rsv <> 0
+  then
+    Error
+      "RSV bits must be zero: no WebSocket extension is negotiated (RFC \
+       6455 §5.2)"
+  else
+    match t.opcode with
+    | `Other _ -> Error "reserved or unsupported opcode"
+    | `Connection_close | `Ping | `Pong ->
+      if not t.is_fin
+      then Error "control frames must not be fragmented (RFC 6455 §5.5)"
+      else if t.payload_length > 125
+      then
+        Error
+          "a control frame's payload must not exceed 125 bytes (RFC 6455 \
+           §5.5)"
+      else Ok ()
+    | `Continuation | `Text | `Binary -> Ok ()
 
 module Reader = struct
   module AU = Angstrom.Unbuffered
