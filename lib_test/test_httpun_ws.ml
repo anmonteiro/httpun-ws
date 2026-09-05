@@ -146,12 +146,38 @@ module Websocket = struct
       Alcotest.(check int) "Reads both frames" len read;
       Alcotest.(check int) "Both frames parsed and handled" 2 !frames_parsed
 
+    (* Unlike [test_parsing_multiple_frames], needs 3+ frames to catch a
+       missing drain: `Read used to advance the queue by only one. *)
+    let test_frame_queue_starvation () =
+      let frames_parsed = ref 0 in
+      let websocket_handler _wsd =
+        let frame ~opcode:_ ~is_fin:_ ~len:_ _payload = incr frames_parsed in
+        let eof ?error:_ () = () in
+        { Websocket_connection.frame; eof }
+      in
+      let t = Server_connection.create_websocket websocket_handler in
+      let frame = serialize_frame ~is_fin:true "hello" in
+      let frame_count = 10 in
+      let frames = String.concat "" (List.init frame_count (fun _ -> frame)) in
+      let len = String.length frames in
+      let bs = Bigstringaf.of_string ~off:0 ~len frames in
+      let read = Server_connection.read t bs ~off:0 ~len in
+      ignore @@ Server_connection.next_read_operation t;
+      Alcotest.(check int) "consumed every byte" len read;
+      Alcotest.(check int)
+        "every already-received frame is dispatched, not just the first two"
+        frame_count
+        !frames_parsed
+
     let tests =
       [ "parsing ping frame", `Quick, test_parsing_ping_frame
       ; "parsing close frame", `Quick, test_parsing_close_frame
       ; "parsing text frame", `Quick, test_parsing_text_frame
       ; "parsing fin bit", `Quick, test_parsing_fin_bit
       ; "parse 2 frames in a payload", `Quick, test_parsing_multiple_frames
+      ; ( "frame-queue starvation on a burst of frames"
+        , `Quick
+        , test_frame_queue_starvation )
       ]
   end
 

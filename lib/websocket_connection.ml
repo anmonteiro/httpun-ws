@@ -88,10 +88,12 @@ let rec _next_read_operation t =
         (* we just don't advance the request queue in the case of a parser
           error. *)
         op
-      | `Read as op ->
-        (* Keep reading when in a "partial" state (`Read). *)
+      | `Read ->
+        (* Drain every already-parsed frame, like the `Close case below,
+           instead of stopping after one and forcing a real read to advance
+           the rest. *)
         advance_frame_queue t;
-        op
+        _next_read_operation t
       | `Close ->
         advance_frame_queue t;
         _next_read_operation t))
