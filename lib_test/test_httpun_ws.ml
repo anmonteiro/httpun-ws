@@ -274,10 +274,31 @@ module Websocket = struct
     Alcotest.(check bool) "handler called" true !handler_called;
     Alcotest.(check int) "parsed entire frame" 8 next_chunk_parsed
 
+  let test_write_closed_drains () =
+    let wsd = ref None in
+    let t =
+      Client_connection.create (fun w ->
+        wsd := Some w;
+        { Websocket_connection.frame = (fun ~opcode:_ ~is_fin:_ ~len:_ _ -> ())
+        ; eof = (fun ?error:_ () -> ())
+        })
+    in
+    let wsd = Option.get !wsd in
+    Wsd.send_bytes wsd ~kind:`Text (Bytes.of_string "x") ~off:0 ~len:1;
+    (match Client_connection.next_write_operation t with
+    | `Write _ -> ()
+    | `Yield | `Close _ -> Alcotest.fail "expected a pending write");
+    Client_connection.report_write_result t `Closed;
+    match Client_connection.next_write_operation t with
+    | `Close _ -> ()
+    | `Write _ -> Alcotest.fail "write operation still pending after `Closed"
+    | `Yield -> Alcotest.fail "expected `Close after `Closed"
+
   let tests =
     [ "reading ping frame", `Quick, test_reading_ping_frame
     ; "reading close frame", `Quick, test_reading_close_frame
     ; "reading text frame", `Quick, test_reading_text_frame
+    ; "write `Closed drains pending output", `Quick, test_write_closed_drains
     ]
 end
 
