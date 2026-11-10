@@ -107,6 +107,11 @@ let close ?code t =
   Faraday.close t.faraday;
   wakeup t
 
+let close_and_drain t =
+  Faraday.close t.faraday;
+  ignore (Faraday.drain t.faraday : int);
+  wakeup t
+
 let error_code t =
   match t.error_code with #error as error -> Some error | `Ok -> None
 
@@ -125,5 +130,5 @@ let next t =
 
 let report_result t result =
   match result with
-  | `Closed -> close t
+  | `Closed -> close_and_drain t
   | `Ok len -> Faraday.shift t.faraday len
